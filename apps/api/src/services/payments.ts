@@ -8,7 +8,14 @@ import {
 import { config } from "../config.js";
 import { getDb } from "../db/schema.js";
 import { upiDirectRail } from "../rails/upi-direct.js";
-import { resolveReceivingVpa } from "./merchant.js";
+import { getMerchantConfig, resolveReceivingVpa } from "./merchant.js";
+import {
+  computeRiskScore,
+  gatherCreateSignals,
+  maybeAlertHighRisk,
+  persistPaymentRisk,
+  pushAlert,
+} from "./risk.js";
 import { dispatchTerminalWebhook } from "./webhooks.js";
 
 interface PaymentRow {
@@ -28,9 +35,19 @@ interface PaymentRow {
   expires_at: string;
   confirmed_at: string | null;
   failure_reason: string | null;
+  risk_score?: number | null;
+  risk_signals?: string | null;
 }
 
 function toDto(row: PaymentRow): PaymentDto {
+  let riskSignals: Record<string, unknown> | null = null;
+  if (row.risk_signals) {
+    try {
+      riskSignals = JSON.parse(row.risk_signals) as Record<string, unknown>;
+    } catch {
+      riskSignals = null;
+    }
+  }
   return {
     id: row.id,
     merchantOrderId: row.merchant_order_id,
@@ -46,6 +63,8 @@ function toDto(row: PaymentRow): PaymentDto {
     updatedAt: row.updated_at,
     expiresAt: row.expires_at,
     confirmedAt: row.confirmed_at,
+    riskScore: row.risk_score ?? 0,
+    riskSignals,
   };
 }
 
@@ -62,6 +81,24 @@ export class SameAmountInProgressError extends Error {
     super("A payment with the same amount is already in progress");
     this.name = "SameAmountInProgressError";
   }
+}
+
+export class FifoSlotBusyError extends Error {
+  constructor(public readonly existing: PaymentDto[]) {
+    super("Single-slot FIFO: another payment is already in progress");
+    this.name = "FifoSlotBusyError";
+  }
+}
+
+export function findAnyInProgress(limit = 20): PaymentDto[] {
+  const placeholders = IN_PROGRESS_STATUSES.map(() => "?").join(",");
+  const rows = getDb()
+    .prepare(
+      `SELECT * FROM payments WHERE status IN (${placeholders})
+       ORDER BY created_at ASC LIMIT ?`
+    )
+    .all(...IN_PROGRESS_STATUSES, limit) as PaymentRow[];
+  return rows.map(toDto);
 }
 
 export function findInProgressSameAmount(amountPaise: number): PaymentDto[] {
@@ -81,6 +118,8 @@ export async function createPayment(input: {
   note?: string;
   idempotencyKey?: string;
   confirmDuplicate?: boolean;
+  /** Explicit override of single-slot FIFO (also implied by confirmDuplicate). */
+  overrideFifo?: boolean;
 }): Promise<PaymentDto> {
   if (!Number.isInteger(input.amountPaise) || input.amountPaise <= 0) {
     throw new Error("amountPaise must be a positive integer");
@@ -91,6 +130,22 @@ export async function createPayment(input: {
       .prepare("SELECT * FROM payments WHERE idempotency_key = ?")
       .get(input.idempotencyKey) as PaymentRow | undefined;
     if (existing) return toDto(existing);
+  }
+
+  const merchant = getMerchantConfig();
+  const allowOverride = Boolean(input.confirmDuplicate || input.overrideFifo);
+  if (merchant.singleSlotFifo) {
+    const open = findAnyInProgress();
+    if (open.length > 0 && !allowOverride) {
+      pushAlert({
+        kind: "queue_blocked",
+        severity: "warning",
+        title: "UPI queue busy (single-slot FIFO)",
+        body: `In-progress: ${open.map((p) => p.id).join(", ")}`,
+        paymentId: open[0]?.id,
+      });
+      throw new FifoSlotBusyError(open);
+    }
   }
 
   const conflicts = findInProgressSameAmount(input.amountPaise);
@@ -138,7 +193,12 @@ export async function createPayment(input: {
       expires_at: expiresAt.toISOString(),
     });
 
-  audit(id, "created", `amount=${input.amountPaise}`);
+  const signals = gatherCreateSignals(input.amountPaise, allowOverride);
+  const score = computeRiskScore(signals);
+  persistPaymentRisk(id, score, signals);
+  maybeAlertHighRisk(id, score);
+
+  audit(id, "created", `amount=${input.amountPaise} risk=${score}`);
   return getPayment(id)!;
 }
 
@@ -255,6 +315,13 @@ export function expireDuePayments(): number {
       )
       .run(now, "Payment timed out", id);
     audit(id, "status:EXPIRED", "TTL");
+    pushAlert({
+      kind: "expired_unpaid",
+      severity: "info",
+      title: "Payment expired",
+      body: "Session timed out without confirm.",
+      paymentId: id,
+    });
     const payment = getPayment(id);
     if (payment) {
       void dispatchTerminalWebhook(

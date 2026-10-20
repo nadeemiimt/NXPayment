@@ -5,39 +5,64 @@ import { upiDirectRail } from "../rails/upi-direct.js";
 import { getMerchantConfig, updateMerchantConfig } from "../services/merchant.js";
 import { listWebhookDeliveries } from "../services/webhooks.js";
 
+const vpa = z.string().regex(/^[a-zA-Z0-9.\-_]{2,}@[a-zA-Z]{2,}$/, "Invalid VPA");
+
 const updateSchema = z.object({
-  primaryVpa: z
-    .string()
-    .regex(/^[a-zA-Z0-9.\-_]{2,}@[a-zA-Z]{2,}$/)
-    .optional(),
-  secondaryVpa: z
-    .string()
-    .regex(/^[a-zA-Z0-9.\-_]{2,}@[a-zA-Z]{2,}$/)
-    .nullable()
-    .optional(),
+  primaryVpa: vpa.optional(),
+  secondaryVpa: z.preprocess(
+    (v) => (v === "" ? null : v),
+    vpa.nullable().optional()
+  ),
   displayName: z.string().min(1).max(64).optional(),
   brandName: z.string().min(1).max(64).optional(),
-  accentColor: z.string().min(4).max(32).optional(),
-  logoUrl: z.string().url().nullable().optional(),
-  webhookUrl: z.string().url().nullable().optional(),
+  accentColor: z.preprocess(
+    (v) =>
+      typeof v === "string" && v.trim().length > 0 && v.trim().length < 4
+        ? "#0B6E4F"
+        : typeof v === "string" && v.trim() === ""
+          ? "#0B6E4F"
+          : v,
+    z.string().min(4).max(32).optional()
+  ),
+  logoUrl: z.preprocess(
+    (v) => (v === "" ? null : v),
+    z.string().url().nullable().optional()
+  ),
+  webhookUrl: z.preprocess(
+    (v) => (v === "" ? null : v),
+    z.string().url().nullable().optional()
+  ),
+  autoConfirmEnabled: z.boolean().optional(),
+  androidAutoConfirm: z.boolean().optional(),
+  emailAutoConfirm: z.boolean().optional(),
+  singleSlotFifo: z.boolean().optional(),
 });
+
+function publicConfig(config: ReturnType<typeof getMerchantConfig>) {
+  return {
+    primaryVpa: config.primaryVpa,
+    secondaryVpa: config.secondaryVpa,
+    displayName: config.displayName,
+    brandName: config.brandName,
+    accentColor: config.accentColor,
+    logoUrl: config.logoUrl,
+    webhookUrl: config.webhookUrl,
+    paymentTtlMs: config.paymentTtlMs,
+    updatedAt: config.updatedAt,
+    autoConfirmEnabled: config.autoConfirmEnabled,
+    androidAutoConfirm: config.androidAutoConfirm,
+    emailAutoConfirm: config.emailAutoConfirm,
+    emailConnected: config.emailConnected,
+    emailProvider: config.emailProvider,
+    emailAddress: config.emailAddress,
+    emailConnectedAt: config.emailConnectedAt,
+    singleSlotFifo: config.singleSlotFifo,
+  };
+}
 
 export async function merchantRoutes(app: FastifyInstance) {
   app.get("/api/merchant/config", async () => {
-    const config = getMerchantConfig();
-    return {
-      config: {
-        primaryVpa: config.primaryVpa,
-        secondaryVpa: config.secondaryVpa,
-        displayName: config.displayName,
-        brandName: config.brandName,
-        accentColor: config.accentColor,
-        logoUrl: config.logoUrl,
-        webhookUrl: config.webhookUrl,
-        paymentTtlMs: config.paymentTtlMs,
-        updatedAt: config.updatedAt,
-      },
-    };
+    return { config: publicConfig(getMerchantConfig()) };
   });
 
   app.put("/api/merchant/config", async (req, reply) => {
@@ -46,19 +71,7 @@ export async function merchantRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: "invalid_body", details: parsed.error.flatten() });
     }
     const config = updateMerchantConfig(parsed.data);
-    return {
-      config: {
-        primaryVpa: config.primaryVpa,
-        secondaryVpa: config.secondaryVpa,
-        displayName: config.displayName,
-        brandName: config.brandName,
-        accentColor: config.accentColor,
-        logoUrl: config.logoUrl,
-        webhookUrl: config.webhookUrl,
-        paymentTtlMs: config.paymentTtlMs,
-        updatedAt: config.updatedAt,
-      },
-    };
+    return { config: publicConfig(config) };
   });
 
   app.get("/api/merchant/webhooks", async () => {

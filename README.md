@@ -14,17 +14,75 @@ Direct-to-merchant **UPI checkout software** — buyers pay the merchant’s own
 
 Product docs (Project store): `docs/project-context.md`, `architecture-plan.md`, `mvp-scope.md`.
 
-## Quick start (local)
+## Requirements
+
+- **Node.js 20+** (API uses Fastify 5)
+
+## Start / stop all (recommended)
+
+Default local path is **Node processes** (API + Web). Requires **Node.js 20+**. After switching Node major versions, run `npm rebuild better-sqlite3` once.
 
 ```bash
 cp deploy/.env.example .env
-
-# API — http://127.0.0.1:3847
-cd apps/api && npm install && npm run dev
-
-# Web — http://127.0.0.1:4321  (separate terminal)
-cd apps/web && npm install && npm run dev
+npm install
+npm run dev:up
 ```
+
+Printed URLs (defaults):
+
+- API: http://127.0.0.1:3847  
+- Web: http://127.0.0.1:4321  
+
+```bash
+npm run dev:down
+npm run dev:restart
+```
+
+Logs and PID files live under `.local/dev/` (gitignored).
+
+Docker alternative (same ports):
+
+```bash
+npm run dev:up:docker
+npm run dev:down:docker
+```
+
+### Manual terminals (optional)
+
+```bash
+cp deploy/.env.example .env
+npm install
+npm run dev:api
+npm run dev:web
+```
+
+API → http://127.0.0.1:3847 · Web → http://127.0.0.1:4321
+
+### Integration tests (temp SQLite, no real money)
+
+Requires **Node.js 20+** (Fastify 5). If nested tests show `cancelledByParent` / “did not finish before its parent”, you are almost certainly on Node 19 or older (`node -v`).
+
+After switching Node major versions (e.g. 24 → 20), rebuild the native SQLite addon so `NODE_MODULE_VERSION` matches:
+
+```bash
+node -v
+npm rebuild better-sqlite3
+npm run test:integration
+```
+
+### Real-money local testing
+
+See **[docs/local-real-money-testing.md](docs/local-real-money-testing.md)** — ₹1 live UPI to your own VPA, merchant Confirm, tally, and refund limits.
+
+### Auto-confirm (Bank SMS & Gmail — not aggregator webhooks)
+
+See **[docs/auto-confirm.md](docs/auto-confirm.md)** and **[docs/youpi-parity.md](docs/youpi-parity.md)**.
+
+```bash
+npm run dev:up
+```
+
+Open http://127.0.0.1:4321/merchant/auto-confirm — enable toggles, connect mock/Gmail, ingest a sample. Android: Flutter **Auto-confirm**. iOS: email poller only.
 
 1. Open [http://127.0.0.1:4321/merchant/onboarding](http://127.0.0.1:4321/merchant/onboarding) → set VPA.  
 2. Open [http://127.0.0.1:4321/checkout](http://127.0.0.1:4321/checkout) → create a payment → scan/open UPI.  
@@ -51,11 +109,14 @@ Enter the API base URL on first launch (use your LAN IP on a device).
 
 ## Docker (one merchant install)
 
+Prefer `npm run dev:up:docker` (above). Equivalent manually:
+
 ```bash
 cp deploy/.env.example .env
-# edit PRIMARY_VPA, secrets, WEBHOOK_URL
 docker compose -f deploy/docker-compose.yml up --build
 ```
+
+Edit `.env` for `PRIMARY_VPA`, secrets, and `WEBHOOK_URL` before production-like use.
 
 - API: port `3847`  
 - Web: port `4321`

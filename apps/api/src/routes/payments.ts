@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
+  FifoSlotBusyError,
   SameAmountInProgressError,
   cancelPayment,
   createPayment,
@@ -13,6 +14,7 @@ import {
   merchantReject,
   reconciliationStub,
 } from "../services/payments.js";
+import { listAlerts, markAlertRead } from "../services/risk.js";
 import { sideEffectBreaker } from "../services/webhooks.js";
 
 const createSchema = z.object({
@@ -21,6 +23,7 @@ const createSchema = z.object({
   note: z.string().max(256).optional(),
   idempotencyKey: z.string().min(8).max(128).optional(),
   confirmDuplicate: z.boolean().optional(),
+  overrideFifo: z.boolean().optional(),
 });
 
 export async function paymentRoutes(app: FastifyInstance) {
@@ -42,9 +45,26 @@ export async function paymentRoutes(app: FastifyInstance) {
           requireConfirmDuplicate: true,
         });
       }
+      if (err instanceof FifoSlotBusyError) {
+        return reply.code(409).send({
+          error: "fifo_slot_busy",
+          message:
+            "Single-slot FIFO: finish or expire the current payment, or pass overrideFifo/confirmDuplicate.",
+          existing: err.existing,
+          requireOverrideFifo: true,
+        });
+      }
       const message = err instanceof Error ? err.message : String(err);
       return reply.code(400).send({ error: "create_failed", message });
     }
+  });
+
+  app.get("/api/alerts", async () => ({ alerts: listAlerts() }));
+
+  app.post("/api/alerts/:id/read", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    markAlertRead(id);
+    return reply.send({ ok: true });
   });
 
   app.get("/api/payments", async (req) => {

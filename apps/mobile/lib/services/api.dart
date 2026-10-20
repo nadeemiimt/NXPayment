@@ -20,7 +20,11 @@ class NxApi {
   }
 
   Future<Payment> confirm(String id) async {
-    final res = await http.post(_u('/api/payments/$id/confirm'));
+    final res = await http.post(
+      _u('/api/payments/$id/confirm'),
+      headers: {'Content-Type': 'application/json'},
+      body: '{}',
+    );
     _ensureOk(res);
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     return Payment.fromJson(body['payment'] as Map<String, dynamic>);
