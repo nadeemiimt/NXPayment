@@ -3,6 +3,7 @@ import cors from "@fastify/cors";
 import sensible from "@fastify/sensible";
 import { config } from "./config.js";
 import { getDb } from "./db/schema.js";
+import { creditRoutes } from "./routes/credits.js";
 import { merchantRoutes } from "./routes/merchant.js";
 import { paymentRoutes } from "./routes/payments.js";
 
@@ -47,6 +48,7 @@ export async function buildApp(opts?: {
 
   await app.register(paymentRoutes);
   await app.register(merchantRoutes);
+  await app.register(creditRoutes);
 
   return app;
 }

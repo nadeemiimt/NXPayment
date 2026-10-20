@@ -67,6 +67,12 @@ describe("NXPayment API integration", () => {
       // inject() — no listen(); ready() loads plugins + opens temp DB
       app = await appMod.buildApp({ logger: false });
       await app.ready();
+      // Existing suite creates concurrent payments; FIFO tests cover single-slot separately.
+      await json(app, "PUT", "/api/merchant/config", { singleSlotFifo: false });
+      await json(app, "PUT", "/api/credits/settings", {
+        autoConfirmEnabled: true,
+        emailAutoConfirm: true,
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       let hint =
@@ -342,5 +348,91 @@ describe("NXPayment API integration", () => {
       );
       await json(requireApp(), "PUT", "/api/merchant/config", { webhookUrl: null });
     }
+  });
+
+  test("YouPI-style SMS parse → unique amount auto-confirms", async () => {
+    const created = await json(requireApp(), "POST", "/api/payments", {
+      amountPaise: 49900,
+      note: "matcher-unique",
+    });
+    assert.equal(created.status, 201);
+    const id = (created.body.payment as Json).id;
+    assert.ok(typeof (created.body.payment as Json).riskScore === "number");
+
+    const obs = await json(requireApp(), "POST", "/api/credits/observe", {
+      source: "sms",
+      rawText:
+        "Dear SBI user, A/C 1234 credited by Rs 499.00 on 08Sep26 by UPI/CR/667788/buyer@okhdfcbank Ref: 667788.",
+    });
+    assert.equal(obs.status, 200);
+    assert.equal(obs.body.outcome, "confirmed");
+    assert.equal((obs.body.payment as Json).id, id);
+    assert.equal((obs.body.payment as Json).status, "SUCCESS");
+  });
+
+  test("ambiguous same-amount credit skips auto-confirm", async () => {
+    const a = await json(requireApp(), "POST", "/api/payments", {
+      amountPaise: 77700,
+      confirmDuplicate: true,
+    });
+    const b = await json(requireApp(), "POST", "/api/payments", {
+      amountPaise: 77700,
+      confirmDuplicate: true,
+    });
+    assert.equal(a.status, 201);
+    assert.equal(b.status, 201);
+
+    const obs = await json(requireApp(), "POST", "/api/credits/observe", {
+      source: "email_gmail",
+      subject: "ALERT: Account credited with Rs. 777.00",
+      rawText: "credited with Rs. 777.00 Ref no: UTR-AMB-1",
+    });
+    assert.equal(obs.body.outcome, "skipped_ambiguous");
+    const gotA = await json(requireApp(), "GET", `/api/payments/${(a.body.payment as Json).id}`);
+    assert.equal((gotA.body.payment as Json).status, "ACTIVE");
+  });
+
+  test("single-slot FIFO blocks second in-progress payment", async () => {
+    await json(requireApp(), "PUT", "/api/merchant/config", { singleSlotFifo: true });
+    const first = await json(requireApp(), "POST", "/api/payments", {
+      amountPaise: 111,
+      confirmDuplicate: true,
+      overrideFifo: true,
+    });
+    assert.equal(first.status, 201);
+
+    const blocked = await json(requireApp(), "POST", "/api/payments", {
+      amountPaise: 222,
+    });
+    assert.equal(blocked.status, 409);
+    assert.equal(blocked.body.error, "fifo_slot_busy");
+
+    const override = await json(requireApp(), "POST", "/api/payments", {
+      amountPaise: 222,
+      overrideFifo: true,
+    });
+    assert.equal(override.status, 201);
+
+    await json(requireApp(), "PUT", "/api/merchant/config", { singleSlotFifo: false });
+    await json(
+      requireApp(),
+      "POST",
+      `/api/payments/${(first.body.payment as Json).id}/reject`
+    );
+    await json(
+      requireApp(),
+      "POST",
+      `/api/payments/${(override.body.payment as Json).id}/reject`
+    );
+  });
+
+  test("manual confirm still works alongside observers", async () => {
+    const created = await json(requireApp(), "POST", "/api/payments", {
+      amountPaise: 333,
+    });
+    const id = (created.body.payment as Json).id;
+    const confirmed = await json(requireApp(), "POST", `/api/payments/${id}/confirm`, {});
+    assert.equal(confirmed.status, 200);
+    assert.equal((confirmed.body.payment as Json).status, "SUCCESS");
   });
 });

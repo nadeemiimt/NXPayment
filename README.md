@@ -74,6 +74,16 @@ npm run test:integration
 
 See **[docs/local-real-money-testing.md](docs/local-real-money-testing.md)** — ₹1 live UPI to your own VPA, merchant Confirm, tally, and refund limits.
 
+### Auto-confirm (Bank SMS & Gmail — not aggregator webhooks)
+
+See **[docs/auto-confirm.md](docs/auto-confirm.md)** and **[docs/youpi-parity.md](docs/youpi-parity.md)**.
+
+```bash
+npm run dev:up
+```
+
+Open http://127.0.0.1:4321/merchant/auto-confirm — enable toggles, connect mock/Gmail, ingest a sample. Android: Flutter **Auto-confirm**. iOS: email poller only.
+
 1. Open [http://127.0.0.1:4321/merchant/onboarding](http://127.0.0.1:4321/merchant/onboarding) → set VPA.  
 2. Open [http://127.0.0.1:4321/checkout](http://127.0.0.1:4321/checkout) → create a payment → scan/open UPI.  
 3. Open [http://127.0.0.1:4321/merchant/pending](http://127.0.0.1:4321/merchant/pending) → **Confirm**.  

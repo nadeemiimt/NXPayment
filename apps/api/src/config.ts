@@ -32,4 +32,10 @@ export const config = {
   circuitFailureThreshold: Number(process.env.CIRCUIT_FAILURE_THRESHOLD ?? 5),
   circuitResetMs: Number(process.env.CIRCUIT_RESET_MS ?? 30_000),
   corsOrigin: process.env.CORS_ORIGIN ?? "*",
+  emailPollMs: Number(process.env.EMAIL_POLL_MS ?? 30_000),
+  gmailClientId: process.env.GMAIL_CLIENT_ID ?? "",
+  gmailClientSecret: process.env.GMAIL_CLIENT_SECRET ?? "",
+  yahooClientId: process.env.YAHOO_CLIENT_ID ?? "",
+  yahooClientSecret: process.env.YAHOO_CLIENT_SECRET ?? "",
+  yahooImapHost: process.env.YAHOO_IMAP_HOST ?? "",
 };

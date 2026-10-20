@@ -75,6 +75,8 @@ export interface PaymentDto {
   updatedAt: string;
   expiresAt: string;
   confirmedAt: string | null;
+  riskScore?: number;
+  riskSignals?: Record<string, unknown> | null;
 }
 
 export interface TallyReport {

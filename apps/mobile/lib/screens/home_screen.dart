@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/payment.dart';
 import '../services/api.dart';
+import 'auto_confirm_screen.dart';
 import 'pending_screen.dart';
 import 'tally_screen.dart';
 
@@ -112,6 +113,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 minimumSize: const Size.fromHeight(52),
               ),
               child: const Text('Open tally'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => AutoConfirmScreen(apiUrl: widget.apiUrl),
+                  ),
+                );
+              },
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+              ),
+              child: const Text('Auto-confirm (SMS / Gmail)'),
             ),
           ],
         ),

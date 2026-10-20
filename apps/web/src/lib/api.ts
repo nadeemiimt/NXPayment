@@ -45,6 +45,13 @@ export interface MerchantConfig {
   webhookUrl: string | null;
   paymentTtlMs: number;
   updatedAt: string;
+  autoConfirmEnabled?: boolean;
+  androidAutoConfirm?: boolean;
+  emailAutoConfirm?: boolean;
+  emailConnected?: boolean;
+  emailProvider?: string | null;
+  emailAddress?: string | null;
+  emailConnectedAt?: string | null;
 }
 
 export interface Tally {
@@ -169,6 +176,76 @@ export const api = {
         createdAt: string;
       }>;
     }>("/api/merchant/webhooks"),
+  creditEmailStatus: () =>
+    request<{
+      autoConfirmEnabled: boolean;
+      androidAutoConfirm: boolean;
+      emailAutoConfirm: boolean;
+      emailConnected: boolean;
+      emailProvider: string | null;
+      emailAddress: string | null;
+      gmailOAuthConfigured: boolean;
+      yahooOAuthConfigured: boolean;
+      primaryVerification: string;
+    }>("/api/credits/email/status"),
+  updateCreditSettings: (body: {
+    autoConfirmEnabled?: boolean;
+    androidAutoConfirm?: boolean;
+    emailAutoConfirm?: boolean;
+  }) =>
+    request<{ config: MerchantConfig }>("/api/credits/settings", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  connectEmail: (body: {
+    provider: "gmail" | "yahoo" | "mock";
+    emailAddress: string;
+    secret: string;
+  }) =>
+    request<{ config: MerchantConfig; note?: string }>("/api/credits/email/connect", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  disconnectEmail: () =>
+    request<{ config: MerchantConfig }>("/api/credits/email/disconnect", {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
+  ingestEmailSample: (body: {
+    subject: string;
+    body: string;
+    from?: string;
+    poll?: boolean;
+  }) =>
+    request<{
+      poll: { scanned: number; confirmed: number; skipped: number };
+    }>("/api/credits/email/ingest", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  observeCredit: (body: {
+    amountPaise?: number;
+    utr?: string;
+    rawText?: string;
+    subject?: string;
+    source:
+      | "android_notification"
+      | "sms"
+      | "email_gmail"
+      | "email_yahoo"
+      | "email_mock"
+      | "manual";
+  }) => request<Record<string, unknown>>("/api/credits/observe", {
+    method: "POST",
+    body: JSON.stringify(body),
+  }),
+  listAlerts: () =>
+    request<{ alerts: Array<Record<string, unknown>> }>("/api/alerts"),
+  markAlertRead: (id: string) =>
+    request<{ ok: boolean }>(`/api/alerts/${id}/read`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
 };
 
 export { SERVER_API_URL as API_URL };

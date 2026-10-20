@@ -29,9 +29,11 @@ Use this file as the **source of truth** for product stance. Architecture and MV
 | # | Decision | Detail |
 | --- | --- | --- |
 | L1 | **Clients: Flutter + Web** | Ship both. Web hosts SimpleCheckout + merchant admin; Flutter ships a real merchant confirm/tally surface (buyer may deep-link to web checkout). |
-| L2 | **Confirmation = merchant Confirm** | Per payment, merchant clicks **Confirm** (or Reject). Buyer waits with clear live status; merchant UI shows the amount prominently. No observer required for MVP launch. |
-| L3 | **Concurrency** | Works for same merchant and different merchants; same or different amounts. If a payment of the **same amount** is already in progress for that merchant, **warn and ask confirmation** before starting another (`confirmDuplicate` flag). Use **timeouts + circuit breaker**. Payments that take too long → `EXPIRED` with clear status. |
+| L2 | **Confirmation = merchant Confirm + observers** | Manual **Confirm/Reject** remains authoritative backup. Optional auto-confirm from **Bank SMS & Gmail alerts** (not aggregator webhooks). Ambiguous matches → manual only. |
+| L3 | **Concurrency / FIFO** | Default **single-slot FIFO**: at most one in-progress UPI payment unless override. Same-amount still returns `409` without `confirmDuplicate`. Timeouts → `EXPIRED`; circuit breaker on side-effects. |
 | L4 | **Status + tally / reports** | Payment status API + tally-style totals: success count, failed, total sales. Design extension points for GST API + reconciliation later — **do not integrate GST in MVP**. |
+| L5 | **Verification stance** | **Payment Verification = Bank SMS & Gmail Alerts parsed in real time.** Not Razorpay/Cashfree-style proprietary webhooks as source of truth. |
+| L6 | **Risk + alerts (NX unique)** | Risk scores on payments + merchant alert center (high-risk, expired, auto-confirm outcomes). |
 
 ---
 
@@ -55,3 +57,6 @@ Online Visa/Mastercard/RuPay **acquiring** requires a bank/acquirer/PSP partner.
 - [`architecture-plan.md`](./architecture-plan.md) — system design for this model  
 - [`mvp-scope.md`](./mvp-scope.md) — first shippable slice  
 - [`gap-analysis.md`](./gap-analysis.md) — YouPI-PG reference + revised stance  
+- [`youpi-parity.md`](./youpi-parity.md) — full YouPI comparison + build phases  
+- [`auto-confirm.md`](./auto-confirm.md) — SMS/Gmail auto-confirm how-to  
+
