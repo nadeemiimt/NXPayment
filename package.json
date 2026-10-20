@@ -1,0 +1,17 @@
+{
+  "name": "nxpayment",
+  "version": "0.1.0",
+  "private": true,
+  "description": "NXPayment — direct-to-merchant UPI checkout software",
+  "workspaces": [
+    "apps/api",
+    "apps/web",
+    "packages/shared"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev --workspace=@nxpayment/api",
+    "dev:web": "npm run dev --workspace=@nxpayment/web",
+    "start:api": "npm run start --workspace=@nxpayment/api",
+    "typecheck:api": "npm run typecheck --workspace=@nxpayment/api"
+  }
+}

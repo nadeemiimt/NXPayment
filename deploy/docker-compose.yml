@@ -1,0 +1,33 @@
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    ports:
+      - "${API_PORT:-3847}:3847"
+    env_file:
+      - ../.env
+    environment:
+      DB_PATH: /data/nxpayment.sqlite
+      API_HOST: 0.0.0.0
+      API_PORT: 3847
+    volumes:
+      - nxpayment-data:/data
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+    ports:
+      - "${WEB_PORT:-4321}:4321"
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://127.0.0.1:3847}
+      PORT: 4321
+      HOSTNAME: 0.0.0.0
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  nxpayment-data:
