@@ -5,6 +5,7 @@ data/*.sqlite
 data/*.sqlite-*
 .env
 *.log
+.local/
 .DS_Store
 apps/mobile/.dart_tool/
 apps/mobile/build/

@@ -18,20 +18,45 @@ Product docs (Project store): `docs/project-context.md`, `architecture-plan.md`,
 
 - **Node.js 20+** (API uses Fastify 5)
 
-## Quick start (local)
+## Start / stop all (recommended)
+
+Default local path is **Node processes** (API + Web). Requires **Node.js 20+**. After switching Node major versions, run `npm rebuild better-sqlite3` once.
 
 ```bash
 cp deploy/.env.example .env
-
-# from repo root (workspaces)
 npm install
+npm run dev:up
+```
 
-# API — http://127.0.0.1:3847
+Printed URLs (defaults):
+
+- API: http://127.0.0.1:3847  
+- Web: http://127.0.0.1:4321  
+
+```bash
+npm run dev:down
+npm run dev:restart
+```
+
+Logs and PID files live under `.local/dev/` (gitignored).
+
+Docker alternative (same ports):
+
+```bash
+npm run dev:up:docker
+npm run dev:down:docker
+```
+
+### Manual terminals (optional)
+
+```bash
+cp deploy/.env.example .env
+npm install
 npm run dev:api
-
-# Web — http://127.0.0.1:4321  (separate terminal)
 npm run dev:web
 ```
+
+API → http://127.0.0.1:3847 · Web → http://127.0.0.1:4321
 
 ### Integration tests (temp SQLite, no real money)
 
@@ -40,7 +65,7 @@ Requires **Node.js 20+** (Fastify 5). If nested tests show `cancelledByParent` /
 After switching Node major versions (e.g. 24 → 20), rebuild the native SQLite addon so `NODE_MODULE_VERSION` matches:
 
 ```bash
-node -v   # must be v20+
+node -v
 npm rebuild better-sqlite3
 npm run test:integration
 ```
@@ -74,11 +99,14 @@ Enter the API base URL on first launch (use your LAN IP on a device).
 
 ## Docker (one merchant install)
 
+Prefer `npm run dev:up:docker` (above). Equivalent manually:
+
 ```bash
 cp deploy/.env.example .env
-# edit PRIMARY_VPA, secrets, WEBHOOK_URL
 docker compose -f deploy/docker-compose.yml up --build
 ```
+
+Edit `.env` for `PRIMARY_VPA`, secrets, and `WEBHOOK_URL` before production-like use.
 
 - API: port `3847`  
 - Web: port `4321`

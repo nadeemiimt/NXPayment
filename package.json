@@ -14,6 +14,11 @@
   "scripts": {
     "dev:api": "npm run dev --workspace=@nxpayment/api",
     "dev:web": "npm run dev --workspace=@nxpayment/web",
+    "dev:up": "bash scripts/dev-up.sh",
+    "dev:down": "bash scripts/dev-down.sh",
+    "dev:restart": "bash scripts/dev-restart.sh",
+    "dev:up:docker": "bash scripts/dev-up-docker.sh",
+    "dev:down:docker": "bash scripts/dev-down-docker.sh",
     "start:api": "npm run start --workspace=@nxpayment/api",
     "typecheck:api": "npm run typecheck --workspace=@nxpayment/api",
     "test:integration": "npm run test:integration --workspace=@nxpayment/api"
