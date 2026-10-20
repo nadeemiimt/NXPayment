@@ -1,25 +1,8 @@
-import Fastify from "fastify";
-import cors from "@fastify/cors";
-import sensible from "@fastify/sensible";
 import { config } from "./config.js";
-import { getDb } from "./db/schema.js";
-import { merchantRoutes } from "./routes/merchant.js";
-import { paymentRoutes } from "./routes/payments.js";
+import { buildApp } from "./app.js";
 import { expireDuePayments } from "./services/payments.js";
 
-const app = Fastify({
-  logger: true,
-});
-
-await app.register(cors, { origin: config.corsOrigin === "*" ? true : config.corsOrigin });
-await app.register(sensible);
-
-getDb();
-
-app.get("/health", async () => ({ ok: true, service: "nxpayment-api" }));
-
-await app.register(paymentRoutes);
-await app.register(merchantRoutes);
+const app = await buildApp();
 
 const expireTimer = setInterval(() => {
   try {

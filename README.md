@@ -14,17 +14,34 @@ Direct-to-merchant **UPI checkout software** — buyers pay the merchant’s own
 
 Product docs (Project store): `docs/project-context.md`, `architecture-plan.md`, `mvp-scope.md`.
 
+## Requirements
+
+- **Node.js 20+** (API uses Fastify 5)
+
 ## Quick start (local)
 
 ```bash
 cp deploy/.env.example .env
 
+# from repo root (workspaces)
+npm install
+
 # API — http://127.0.0.1:3847
-cd apps/api && npm install && npm run dev
+npm run dev:api
 
 # Web — http://127.0.0.1:4321  (separate terminal)
-cd apps/web && npm install && npm run dev
+npm run dev:web
 ```
+
+### Integration tests (temp SQLite, no real money)
+
+```bash
+npm run test:integration
+```
+
+### Real-money local testing
+
+See **[docs/local-real-money-testing.md](docs/local-real-money-testing.md)** — ₹1 live UPI to your own VPA, merchant Confirm, tally, and refund limits.
 
 1. Open [http://127.0.0.1:4321/merchant/onboarding](http://127.0.0.1:4321/merchant/onboarding) → set VPA.  
 2. Open [http://127.0.0.1:4321/checkout](http://127.0.0.1:4321/checkout) → create a payment → scan/open UPI.  
