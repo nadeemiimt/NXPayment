@@ -5,21 +5,33 @@ import { upiDirectRail } from "../rails/upi-direct.js";
 import { getMerchantConfig, updateMerchantConfig } from "../services/merchant.js";
 import { listWebhookDeliveries } from "../services/webhooks.js";
 
+const vpa = z.string().regex(/^[a-zA-Z0-9.\-_]{2,}@[a-zA-Z]{2,}$/, "Invalid VPA");
+
 const updateSchema = z.object({
-  primaryVpa: z
-    .string()
-    .regex(/^[a-zA-Z0-9.\-_]{2,}@[a-zA-Z]{2,}$/)
-    .optional(),
-  secondaryVpa: z
-    .string()
-    .regex(/^[a-zA-Z0-9.\-_]{2,}@[a-zA-Z]{2,}$/)
-    .nullable()
-    .optional(),
+  primaryVpa: vpa.optional(),
+  secondaryVpa: z.preprocess(
+    (v) => (v === "" ? null : v),
+    vpa.nullable().optional()
+  ),
   displayName: z.string().min(1).max(64).optional(),
   brandName: z.string().min(1).max(64).optional(),
-  accentColor: z.string().min(4).max(32).optional(),
-  logoUrl: z.string().url().nullable().optional(),
-  webhookUrl: z.string().url().nullable().optional(),
+  accentColor: z.preprocess(
+    (v) =>
+      typeof v === "string" && v.trim().length > 0 && v.trim().length < 4
+        ? "#0B6E4F"
+        : typeof v === "string" && v.trim() === ""
+          ? "#0B6E4F"
+          : v,
+    z.string().min(4).max(32).optional()
+  ),
+  logoUrl: z.preprocess(
+    (v) => (v === "" ? null : v),
+    z.string().url().nullable().optional()
+  ),
+  webhookUrl: z.preprocess(
+    (v) => (v === "" ? null : v),
+    z.string().url().nullable().optional()
+  ),
 });
 
 export async function merchantRoutes(app: FastifyInstance) {

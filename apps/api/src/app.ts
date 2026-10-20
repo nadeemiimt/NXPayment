@@ -16,6 +16,9 @@ export async function buildApp(opts?: {
 
   await app.register(cors, {
     origin: config.corsOrigin === "*" ? true : config.corsOrigin,
+    // Default @fastify/cors can omit PUT; browser onboarding uses PUT /api/merchant/config
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
   });
   await app.register(sensible);
 

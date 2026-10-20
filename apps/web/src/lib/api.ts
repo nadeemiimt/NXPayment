@@ -1,4 +1,13 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:3847";
+/**
+ * Browser calls use same-origin `/api/...` (Next rewrite → Fastify).
+ * Server-side code can still hit the API origin directly.
+ */
+const SERVER_API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:3847";
+
+function apiBase(): string {
+  if (typeof window !== "undefined") return "";
+  return SERVER_API_URL;
+}
 
 export type PaymentStatus =
   | "INITIATED"
@@ -49,18 +58,45 @@ export interface Tally {
   totalSalesPaise: number;
 }
 
+function formatApiError(status: number, data: Record<string, unknown>): string {
+  if (typeof data.message === "string" && data.message) return data.message;
+  if (data.error === "invalid_body" && data.details && typeof data.details === "object") {
+    const fieldErrors = (data.details as { fieldErrors?: Record<string, string[]> })
+      .fieldErrors;
+    if (fieldErrors) {
+      const parts = Object.entries(fieldErrors)
+        .filter(([, msgs]) => msgs?.length)
+        .map(([field, msgs]) => `${field}: ${msgs.join(", ")}`);
+      if (parts.length) return parts.join("; ");
+    }
+  }
+  if (typeof data.error === "string" && data.error) return data.error;
+  return `HTTP ${status}`;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-    cache: "no-store",
-  });
-  const data = await res.json().catch(() => ({}));
+  let res: Response;
+  try {
+    res = await fetch(`${apiBase()}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+      cache: "no-store",
+    });
+  } catch {
+    throw new Error(
+      "Cannot reach the API. Is it running? Try npm run dev:up (API http://127.0.0.1:3847)."
+    );
+  }
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
-    const err = new Error(data.message ?? data.error ?? `HTTP ${res.status}`) as Error & {
+    let message = formatApiError(res.status, data);
+    if (res.status >= 500 && (!data.error || Object.keys(data).length === 0)) {
+      message = `API unavailable (HTTP ${res.status}). Start it with npm run dev:up.`;
+    }
+    const err = new Error(message) as Error & {
       status: number;
       body: unknown;
     };
@@ -115,4 +151,4 @@ export const api = {
     }>("/api/merchant/webhooks"),
 };
 
-export { API_URL };
+export { SERVER_API_URL as API_URL };
