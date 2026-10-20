@@ -35,7 +35,10 @@ npm run dev:web
 
 ### Integration tests (temp SQLite, no real money)
 
+Requires **Node.js 20+** (Fastify 5). If nested tests show `cancelledByParent` / “did not finish before its parent”, you are almost certainly on Node 19 or older (`node -v`).
+
 ```bash
+node -v   # must be v20+
 npm run test:integration
 ```
 
