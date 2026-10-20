@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { api, type MerchantConfig } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+const VPA_RE = /^[a-zA-Z0-9.\-_]{2,}@[a-zA-Z]{2,}$/;
+
 export default function OnboardingPage() {
+  const router = useRouter();
   const [form, setForm] = useState({
     primaryVpa: "",
     secondaryVpa: "",
@@ -18,36 +22,64 @@ export default function OnboardingPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.getConfig().then((r) => {
-      setSaved(r.config);
-      setForm({
-        primaryVpa: r.config.primaryVpa,
-        secondaryVpa: r.config.secondaryVpa ?? "",
-        displayName: r.config.displayName,
-        brandName: r.config.brandName,
-        accentColor: r.config.accentColor,
-        webhookUrl: r.config.webhookUrl ?? "",
+    api
+      .getConfig()
+      .then((r) => {
+        setSaved(r.config);
+        setForm({
+          primaryVpa: r.config.primaryVpa,
+          secondaryVpa: r.config.secondaryVpa ?? "",
+          displayName: r.config.displayName,
+          brandName: r.config.brandName,
+          accentColor: r.config.accentColor?.trim() || "#0B6E4F",
+          webhookUrl: r.config.webhookUrl ?? "",
+        });
+        setLoadError(null);
+      })
+      .catch((err) => {
+        setLoadError(err instanceof Error ? err.message : "Could not load merchant config");
       });
-    });
   }, []);
 
   async function save() {
     setLoading(true);
     setError(null);
     setMessage(null);
+
+    const primaryVpa = form.primaryVpa.trim();
+    const displayName = form.displayName.trim();
+    if (!VPA_RE.test(primaryVpa)) {
+      setError("Enter a valid primary VPA (e.g. shop@upi).");
+      setLoading(false);
+      return;
+    }
+    if (!displayName) {
+      setError("Display name is required.");
+      setLoading(false);
+      return;
+    }
+    if (form.secondaryVpa.trim() && !VPA_RE.test(form.secondaryVpa.trim())) {
+      setError("Secondary VPA looks invalid (or leave it blank).");
+      setLoading(false);
+      return;
+    }
+
     try {
-      const { config } = await api.updateConfig({
-        primaryVpa: form.primaryVpa,
-        secondaryVpa: form.secondaryVpa || null,
-        displayName: form.displayName,
-        brandName: form.brandName,
-        accentColor: form.accentColor,
-        webhookUrl: form.webhookUrl || null,
-      });
+      const body: Partial<MerchantConfig> = {
+        primaryVpa,
+        secondaryVpa: form.secondaryVpa.trim() || null,
+        displayName,
+        brandName: form.brandName.trim() || displayName,
+        accentColor: form.accentColor.trim() || "#0B6E4F",
+        webhookUrl: form.webhookUrl.trim() || null,
+      };
+      const { config } = await api.updateConfig(body);
       setSaved(config);
-      setMessage("Saved. Try a ₹1 test payment from checkout, then Confirm.");
+      setMessage("Saved. Opening pending confirms…");
+      router.push("/merchant/pending");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -62,12 +94,19 @@ export default function OnboardingPage() {
         VPA → branding → test payment. Money settles to your account; NXPayment is software.
       </p>
 
+      {loadError && (
+        <p className="mt-4 rounded-md border border-[#9B2C2C]/40 bg-[#9B2C2C]/10 px-3 py-2 text-sm text-[#9B2C2C]">
+          {loadError}
+        </p>
+      )}
+
       <div className="mt-8 space-y-4">
         <Field label="Primary UPI VPA">
           <Input
             value={form.primaryVpa}
             onChange={(e) => setForm({ ...form, primaryVpa: e.target.value })}
             placeholder="shop@upi"
+            autoComplete="off"
           />
         </Field>
         <Field label="Secondary VPA (fallback)">
@@ -75,6 +114,7 @@ export default function OnboardingPage() {
             value={form.secondaryVpa}
             onChange={(e) => setForm({ ...form, secondaryVpa: e.target.value })}
             placeholder="optional@upi"
+            autoComplete="off"
           />
         </Field>
         <Field label="Display name (UPI pn=)">
@@ -102,9 +142,16 @@ export default function OnboardingPage() {
             placeholder="https://your.store/hooks/nxpayment"
           />
         </Field>
-        {error && <p className="text-sm text-[#9B2C2C]">{error}</p>}
+        {error && (
+          <p
+            role="alert"
+            className="rounded-md border border-[#9B2C2C]/40 bg-[#9B2C2C]/10 px-3 py-2 text-sm text-[#9B2C2C]"
+          >
+            {error}
+          </p>
+        )}
         {message && <p className="text-sm text-[var(--nx-accent)]">{message}</p>}
-        <Button size="lg" disabled={loading} onClick={save}>
+        <Button type="button" size="lg" disabled={loading} onClick={() => void save()}>
           {loading ? "Saving…" : "Save & continue"}
         </Button>
       </div>

@@ -18,6 +18,14 @@ export function getDb(): Db {
   return db;
 }
 
+/** Close and drop the singleton — for integration tests with a fresh temp DB. */
+export function closeDb(): void {
+  if (db) {
+    db.close();
+    db = null;
+  }
+}
+
 function migrate(database: Db) {
   database.exec(`
     CREATE TABLE IF NOT EXISTS merchant_config (
