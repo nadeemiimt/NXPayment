@@ -69,10 +69,15 @@ describe("NXPayment API integration", () => {
       await app.ready();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      let hint =
+        `If you see tracingChannel / diagnostics errors, upgrade to Node.js 20+ ` +
+        `(current ${process.version}).`;
+      if (/NODE_MODULE_VERSION|better-sqlite3/i.test(msg)) {
+        hint =
+          "Run `npm rebuild better-sqlite3` (or reinstall node_modules) under the same Node you use for tests.";
+      }
       throw new Error(
-        `Integration before() failed while building Fastify app: ${msg}. ` +
-          `If you see tracingChannel / diagnostics errors, upgrade to Node.js 20+ ` +
-          `(current ${process.version}).`
+        `Integration before() failed while building Fastify app: ${msg}. ${hint}`
       );
     }
   });

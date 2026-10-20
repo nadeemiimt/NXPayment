@@ -37,8 +37,11 @@ npm run dev:web
 
 Requires **Node.js 20+** (Fastify 5). If nested tests show `cancelledByParent` / “did not finish before its parent”, you are almost certainly on Node 19 or older (`node -v`).
 
+After switching Node major versions (e.g. 24 → 20), rebuild the native SQLite addon so `NODE_MODULE_VERSION` matches:
+
 ```bash
 node -v   # must be v20+
+npm rebuild better-sqlite3
 npm run test:integration
 ```
 
