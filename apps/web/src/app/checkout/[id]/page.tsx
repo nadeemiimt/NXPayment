@@ -6,7 +6,7 @@ import { QRCodeSVG } from "qrcode.react";
 import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
-import { api, type Payment, type PaymentStatus } from "@/lib/api";
+import { api, type MerchantConfig, type Payment, type PaymentStatus } from "@/lib/api";
 import { formatInr } from "@/lib/utils";
 
 const TERMINAL: PaymentStatus[] = ["SUCCESS", "FAILED", "EXPIRED", "CANCELLED"];
@@ -48,8 +48,13 @@ function statusCopy(status: PaymentStatus): { title: string; body: string } {
 export default function CheckoutStatusPage() {
   const params = useParams<{ id: string }>();
   const [payment, setPayment] = useState<Payment | null>(null);
+  const [config, setConfig] = useState<MerchantConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    api.getConfig().then((r) => setConfig(r.config)).catch(() => setConfig(null));
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -96,13 +101,15 @@ export default function CheckoutStatusPage() {
 
   const copy = statusCopy(payment.status);
   const waiting = !TERMINAL.includes(payment.status);
+  const hideChrome = Boolean(config?.hideNxChrome);
+  const brand = config?.brandName?.trim() || "Checkout";
 
   return (
     <main className="min-h-screen">
       <SiteHeader tone="minimal" />
       <div className="mx-auto max-w-lg px-5 pb-20">
         <p className="text-sm uppercase tracking-[0.2em] text-[var(--nx-accent)]">
-          NXPayment checkout
+          {hideChrome ? brand : `${brand} checkout`}
         </p>
         <h1 className="font-display mt-2 text-4xl font-semibold">{formatInr(payment.amountPaise)}</h1>
         <p className="mt-1 text-[var(--nx-muted)]">

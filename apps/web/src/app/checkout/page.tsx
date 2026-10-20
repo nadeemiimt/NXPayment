@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
+import { WhatsAppOtpGate } from "@/components/whatsapp-otp-gate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -15,9 +16,12 @@ import {
 import { api, type MerchantConfig, type Payment } from "@/lib/api";
 import { formatInr } from "@/lib/utils";
 
+const CHECKOUT_OTP_KEY = "nxpayment_checkout_otp_ok";
+
 export default function CheckoutStartPage() {
   const router = useRouter();
   const [config, setConfig] = useState<MerchantConfig | null>(null);
+  const [otpOk, setOtpOk] = useState(false);
   const [rupees, setRupees] = useState("100");
   const [orderId, setOrderId] = useState("");
   const [note, setNote] = useState("");
@@ -27,7 +31,20 @@ export default function CheckoutStartPage() {
   const [existing, setExisting] = useState<Payment[]>([]);
 
   useEffect(() => {
-    api.getConfig().then((r) => setConfig(r.config)).catch(() => setConfig(null));
+    api
+      .getConfig()
+      .then((r) => {
+        setConfig(r.config);
+        if (!r.config.whatsappOtpEnabled) {
+          setOtpOk(true);
+        } else if (sessionStorage.getItem(CHECKOUT_OTP_KEY) === "1") {
+          setOtpOk(true);
+        }
+      })
+      .catch(() => {
+        setConfig(null);
+        setOtpOk(true);
+      });
   }, []);
 
   async function create(confirmDuplicate = false) {
@@ -67,13 +84,18 @@ export default function CheckoutStartPage() {
     }
   }
 
+  const brand = config?.brandName ?? "Checkout";
+  const hideChrome = Boolean(config?.hideNxChrome);
+
   return (
     <main className="min-h-screen">
       <SiteHeader />
       <div className="mx-auto max-w-lg px-5 pb-16 pt-4">
-        <p className="text-sm uppercase tracking-[0.2em] text-[var(--nx-accent)]">
-          SimpleCheckout
-        </p>
+        {!hideChrome && (
+          <p className="text-sm uppercase tracking-[0.2em] text-[var(--nx-accent)]">
+            SimpleCheckout
+          </p>
+        )}
         <h1 className="font-display mt-2 text-4xl font-semibold text-[var(--nx-ink)]">
           Pay {config?.displayName ?? "merchant"}
         </h1>
@@ -82,42 +104,59 @@ export default function CheckoutStartPage() {
           <span className="font-medium text-[var(--nx-ink)]">
             {config?.primaryVpa ?? "merchant VPA"}
           </span>
-          . NXPayment never holds the money.
+          {hideChrome
+            ? "."
+            : ". NXPayment never holds the money."}
         </p>
 
-        <div className="mt-8 space-y-4">
-          <label className="block text-sm font-medium">
-            Amount (₹)
-            <Input
-              className="mt-1.5"
-              inputMode="decimal"
-              value={rupees}
-              onChange={(e) => setRupees(e.target.value)}
+        {config?.whatsappOtpEnabled && !otpOk ? (
+          <div className="mt-8">
+            <WhatsAppOtpGate
+              purpose="checkout_gate"
+              defaultPhone={config.whatsappOtpPhone ?? undefined}
+              title={`${brand} verification`}
+              description="Enter the WhatsApp OTP to continue to UPI checkout."
+              onVerified={() => {
+                sessionStorage.setItem(CHECKOUT_OTP_KEY, "1");
+                setOtpOk(true);
+              }}
             />
-          </label>
-          <label className="block text-sm font-medium">
-            Order reference (optional)
-            <Input
-              className="mt-1.5"
-              value={orderId}
-              onChange={(e) => setOrderId(e.target.value)}
-              placeholder="ORD-1042"
-            />
-          </label>
-          <label className="block text-sm font-medium">
-            Note (optional)
-            <Input
-              className="mt-1.5"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Table 4"
-            />
-          </label>
-          {error && <p className="text-sm text-[#9B2C2C]">{error}</p>}
-          <Button className="w-full" size="lg" disabled={loading} onClick={() => create(false)}>
-            {loading ? "Creating…" : "Continue to UPI"}
-          </Button>
-        </div>
+          </div>
+        ) : (
+          <div className="mt-8 space-y-4">
+            <label className="block text-sm font-medium">
+              Amount (₹)
+              <Input
+                className="mt-1.5"
+                inputMode="decimal"
+                value={rupees}
+                onChange={(e) => setRupees(e.target.value)}
+              />
+            </label>
+            <label className="block text-sm font-medium">
+              Order reference (optional)
+              <Input
+                className="mt-1.5"
+                value={orderId}
+                onChange={(e) => setOrderId(e.target.value)}
+                placeholder="ORD-1042"
+              />
+            </label>
+            <label className="block text-sm font-medium">
+              Note (optional)
+              <Input
+                className="mt-1.5"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Table 4"
+              />
+            </label>
+            {error && <p className="text-sm text-[#9B2C2C]">{error}</p>}
+            <Button className="w-full" size="lg" disabled={loading} onClick={() => create(false)}>
+              {loading ? "Creating…" : "Continue to UPI"}
+            </Button>
+          </div>
+        )}
       </div>
 
       <Dialog open={dupOpen} onOpenChange={setDupOpen}>

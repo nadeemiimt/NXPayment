@@ -435,4 +435,131 @@ describe("NXPayment API integration", () => {
     assert.equal(confirmed.status, 200);
     assert.equal((confirmed.body.payment as Json).status, "SUCCESS");
   });
+
+  test("WhatsApp OTP stub send + verify (dry-run)", async () => {
+    const status = await json(requireApp(), "GET", "/api/otp/whatsapp/status");
+    assert.equal(status.status, 200);
+    assert.equal(status.body.mode, "stub");
+    assert.equal(status.body.configured, false);
+
+    await json(requireApp(), "PUT", "/api/merchant/config", {
+      whatsappOtpEnabled: true,
+      whatsappOtpPhone: "+919876543210",
+    });
+
+    const sent = await json(requireApp(), "POST", "/api/otp/whatsapp/send", {
+      phoneE164: "+919876543210",
+      purpose: "onboarding_gate",
+    });
+    assert.equal(sent.status, 201);
+    assert.equal(sent.body.mode, "stub");
+    assert.ok(typeof sent.body.stubCode === "string");
+    assert.ok(typeof sent.body.challengeId === "string");
+
+    const bad = await json(requireApp(), "POST", "/api/otp/whatsapp/verify", {
+      challengeId: sent.body.challengeId,
+      code: "000000",
+    });
+    assert.equal(bad.status, 400);
+
+    const ok = await json(requireApp(), "POST", "/api/otp/whatsapp/verify", {
+      challengeId: sent.body.challengeId,
+      code: sent.body.stubCode,
+    });
+    assert.equal(ok.status, 200);
+    assert.equal(ok.body.ok, true);
+
+    const cfg = await json(requireApp(), "GET", "/api/merchant/config");
+    assert.ok((cfg.body.config as Json).whatsappVerifiedAt);
+  });
+
+  test("till desk cash + card_counter confirm", async () => {
+    const cash = await json(requireApp(), "POST", "/api/till/sales", {
+      amountPaise: 15000,
+      method: "cash",
+      note: "counter cash",
+      confirm: true,
+    });
+    assert.equal(cash.status, 201);
+    assert.equal((cash.body.payment as Json).status, "SUCCESS");
+    assert.equal((cash.body.payment as Json).method, "cash");
+    assert.equal((cash.body.payment as Json).railId, "till_desk");
+
+    const openCard = await json(requireApp(), "POST", "/api/till/sales", {
+      amountPaise: 25000,
+      method: "card_counter",
+      confirm: false,
+    });
+    assert.equal(openCard.status, 201);
+    assert.equal((openCard.body.payment as Json).status, "ACTIVE");
+    const cardId = (openCard.body.payment as Json).id as string;
+
+    const openList = await json(requireApp(), "GET", "/api/till/open");
+    assert.ok(
+      ((openList.body.payments as Json[]) ?? []).some((p) => p.id === cardId)
+    );
+
+    const confirmed = await json(
+      requireApp(),
+      "POST",
+      `/api/till/sales/${cardId}/confirm`,
+      {}
+    );
+    assert.equal(confirmed.status, 200);
+    assert.equal((confirmed.body.payment as Json).status, "SUCCESS");
+  });
+
+  test("alerts read + dismiss", async () => {
+    // Force a high-risk path: fifo override + same amount open bump score.
+    await json(requireApp(), "PUT", "/api/merchant/config", { singleSlotFifo: false });
+    const a = await json(requireApp(), "POST", "/api/payments", {
+      amountPaise: 88800,
+    });
+    assert.equal(a.status, 201);
+    const b = await json(requireApp(), "POST", "/api/payments", {
+      amountPaise: 88800,
+      confirmDuplicate: true,
+    });
+    assert.equal(b.status, 201);
+    // sameAmountOpen on second create should raise risk; may or may not hit 60.
+    const alerts = await json(requireApp(), "GET", "/api/alerts");
+    assert.equal(alerts.status, 200);
+    assert.ok(Array.isArray(alerts.body.alerts));
+    assert.ok(typeof alerts.body.unreadCount === "number");
+
+    // Create an explicit alert via till sale (always pushes till_sale).
+    const till = await json(requireApp(), "POST", "/api/till/sales", {
+      amountPaise: 100,
+      method: "cash",
+      confirm: true,
+    });
+    assert.equal(till.status, 201);
+
+    const after = await json(requireApp(), "GET", "/api/alerts");
+    const list = after.body.alerts as Json[];
+    assert.ok(list.length >= 1);
+    const first = list[0]!;
+    const id = first.id as string;
+
+    const read = await json(requireApp(), "POST", `/api/alerts/${id}/read`, {});
+    assert.equal(read.status, 200);
+
+    const dismiss = await json(requireApp(), "POST", `/api/alerts/${id}/dismiss`, {});
+    assert.equal(dismiss.status, 200);
+
+    const final = await json(requireApp(), "GET", "/api/alerts");
+    assert.ok(!(final.body.alerts as Json[]).some((x) => x.id === id));
+
+    await json(requireApp(), "POST", "/api/alerts/read-all", {});
+  });
+
+  test("white-label config hideNxChrome + brandName", async () => {
+    const updated = await json(requireApp(), "PUT", "/api/merchant/config", {
+      brandName: "Acme Pay",
+      hideNxChrome: true,
+    });
+    assert.equal(updated.status, 200);
+    assert.equal((updated.body.config as Json).brandName, "Acme Pay");
+    assert.equal((updated.body.config as Json).hideNxChrome, true);
+  });
 });

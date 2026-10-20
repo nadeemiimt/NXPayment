@@ -14,7 +14,13 @@ import {
   merchantReject,
   reconciliationStub,
 } from "../services/payments.js";
-import { listAlerts, markAlertRead } from "../services/risk.js";
+import {
+  dismissAlert,
+  listAlerts,
+  markAlertRead,
+  markAllAlertsRead,
+  unreadAlertCount,
+} from "../services/risk.js";
 import { sideEffectBreaker } from "../services/webhooks.js";
 
 const createSchema = z.object({
@@ -59,12 +65,34 @@ export async function paymentRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get("/api/alerts", async () => ({ alerts: listAlerts() }));
+  app.get("/api/alerts", async (req) => {
+    const q = req.query as { unreadOnly?: string; limit?: string };
+    return {
+      alerts: listAlerts({
+        unreadOnly: q.unreadOnly === "1" || q.unreadOnly === "true",
+        limit: q.limit ? Number(q.limit) : 50,
+      }),
+      unreadCount: unreadAlertCount(),
+    };
+  });
 
   app.post("/api/alerts/:id/read", async (req, reply) => {
     const { id } = req.params as { id: string };
-    markAlertRead(id);
-    return reply.send({ ok: true });
+    const ok = markAlertRead(id);
+    if (!ok) return reply.code(404).send({ error: "not_found" });
+    return reply.send({ ok: true, unreadCount: unreadAlertCount() });
+  });
+
+  app.post("/api/alerts/:id/dismiss", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const ok = dismissAlert(id);
+    if (!ok) return reply.code(404).send({ error: "not_found" });
+    return reply.send({ ok: true, unreadCount: unreadAlertCount() });
+  });
+
+  app.post("/api/alerts/read-all", async () => {
+    const updated = markAllAlertsRead();
+    return { ok: true, updated, unreadCount: unreadAlertCount() };
   });
 
   app.get("/api/payments", async (req) => {

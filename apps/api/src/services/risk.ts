@@ -8,6 +8,8 @@ export interface RiskSignals {
   recentFailed: number;
   observerMismatch?: boolean;
   fifoOverride?: boolean;
+  tillMethod?: boolean;
+  largeAmount?: boolean;
 }
 
 /** Pluggable risk model — returns 0–100. */
@@ -25,6 +27,9 @@ export function computeRiskScore(signals: RiskSignals): number {
 
   if (signals.observerMismatch) score += 25;
   if (signals.fifoOverride) score += 10;
+  if (signals.largeAmount) score += 12;
+  // Till desk cash/card is lower digital fraud risk but still worth a light flag.
+  if (signals.tillMethod) score += 5;
 
   return Math.min(100, score);
 }
@@ -56,6 +61,7 @@ export function gatherCreateSignals(amountPaise: number, fifoOverride: boolean):
     sameAmountOpen,
     recentFailed,
     fifoOverride,
+    largeAmount: amountPaise >= 50_000_00, // ≥ ₹50,000
   };
 }
 
@@ -71,6 +77,18 @@ export function persistPaymentRisk(
 
 export type AlertSeverity = "info" | "warning" | "critical";
 
+export interface AlertRow {
+  id: string;
+  kind: string;
+  severity: string;
+  title: string;
+  body: string | null;
+  paymentId: string | null;
+  read: number;
+  dismissed: number;
+  createdAt: string;
+}
+
 export function pushAlert(input: {
   kind: string;
   severity: AlertSeverity;
@@ -81,8 +99,8 @@ export function pushAlert(input: {
   const id = nanoid(12);
   getDb()
     .prepare(
-      `INSERT INTO merchant_alerts (id, kind, severity, title, body, payment_id, read, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, 0, ?)`
+      `INSERT INTO merchant_alerts (id, kind, severity, title, body, payment_id, read, dismissed, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?)`
     )
     .run(
       id,
@@ -96,17 +114,56 @@ export function pushAlert(input: {
   return id;
 }
 
-export function listAlerts(limit = 50) {
+export function listAlerts(opts?: {
+  limit?: number;
+  unreadOnly?: boolean;
+  includeDismissed?: boolean;
+}): AlertRow[] {
+  const limit = opts?.limit ?? 50;
+  const clauses: string[] = [];
+  if (!opts?.includeDismissed) clauses.push("dismissed = 0");
+  if (opts?.unreadOnly) clauses.push("read = 0");
+  const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
   return getDb()
     .prepare(
-      `SELECT id, kind, severity, title, body, payment_id as paymentId, read, created_at as createdAt
-       FROM merchant_alerts ORDER BY created_at DESC LIMIT ?`
+      `SELECT id, kind, severity, title, body, payment_id as paymentId, read,
+              dismissed, created_at as createdAt
+       FROM merchant_alerts ${where}
+       ORDER BY created_at DESC LIMIT ?`
     )
-    .all(limit);
+    .all(limit) as AlertRow[];
 }
 
-export function markAlertRead(id: string) {
-  getDb().prepare(`UPDATE merchant_alerts SET read = 1 WHERE id = ?`).run(id);
+export function unreadAlertCount(): number {
+  const row = getDb()
+    .prepare(
+      `SELECT COUNT(*) as c FROM merchant_alerts WHERE read = 0 AND dismissed = 0`
+    )
+    .get() as { c: number };
+  return row.c;
+}
+
+export function markAlertRead(id: string): boolean {
+  const result = getDb()
+    .prepare(`UPDATE merchant_alerts SET read = 1 WHERE id = ? AND dismissed = 0`)
+    .run(id);
+  return result.changes > 0;
+}
+
+export function markAllAlertsRead(): number {
+  const result = getDb()
+    .prepare(`UPDATE merchant_alerts SET read = 1 WHERE read = 0 AND dismissed = 0`)
+    .run();
+  return result.changes;
+}
+
+export function dismissAlert(id: string): boolean {
+  const result = getDb()
+    .prepare(
+      `UPDATE merchant_alerts SET dismissed = 1, read = 1 WHERE id = ?`
+    )
+    .run(id);
+  return result.changes > 0;
 }
 
 export function maybeAlertHighRisk(paymentId: string, score: number) {

@@ -19,6 +19,10 @@ export interface MerchantConfigRow {
   email_secret?: string | null;
   email_connected_at?: string | null;
   single_slot_fifo?: number | null;
+  hide_nx_chrome?: number | null;
+  whatsapp_otp_enabled?: number | null;
+  whatsapp_otp_phone?: string | null;
+  whatsapp_verified_at?: string | null;
 }
 
 export function getMerchantConfig() {
@@ -46,6 +50,10 @@ export function getMerchantConfig() {
     singleSlotFifo: row.single_slot_fifo === undefined || row.single_slot_fifo === null
       ? true
       : Boolean(row.single_slot_fifo),
+    hideNxChrome: Boolean(row.hide_nx_chrome),
+    whatsappOtpEnabled: Boolean(row.whatsapp_otp_enabled),
+    whatsappOtpPhone: row.whatsapp_otp_phone ?? null,
+    whatsappVerifiedAt: row.whatsapp_verified_at ?? null,
   };
 }
 
@@ -61,6 +69,9 @@ export function updateMerchantConfig(input: {
   androidAutoConfirm?: boolean;
   emailAutoConfirm?: boolean;
   singleSlotFifo?: boolean;
+  hideNxChrome?: boolean;
+  whatsappOtpEnabled?: boolean;
+  whatsappOtpPhone?: string | null;
 }) {
   const current = getMerchantConfig();
   const row = getDb()
@@ -101,8 +112,35 @@ export function updateMerchantConfig(input: {
           ? 1
           : 0
         : row.single_slot_fifo ?? 1,
+    hide_nx_chrome:
+      input.hideNxChrome !== undefined
+        ? input.hideNxChrome
+          ? 1
+          : 0
+        : row.hide_nx_chrome ?? 0,
+    whatsapp_otp_enabled:
+      input.whatsappOtpEnabled !== undefined
+        ? input.whatsappOtpEnabled
+          ? 1
+          : 0
+        : row.whatsapp_otp_enabled ?? 0,
+    whatsapp_otp_phone:
+      input.whatsappOtpPhone !== undefined
+        ? input.whatsappOtpPhone
+        : row.whatsapp_otp_phone ?? null,
     updated_at: new Date().toISOString(),
   };
+
+  // Reset verified_at when enabling OTP or changing phone so gate must re-verify.
+  if (
+    input.whatsappOtpEnabled === true ||
+    (input.whatsappOtpPhone !== undefined &&
+      input.whatsappOtpPhone !== current.whatsappOtpPhone)
+  ) {
+    getDb()
+      .prepare(`UPDATE merchant_config SET whatsapp_verified_at = NULL WHERE id = 1`)
+      .run();
+  }
 
   getDb()
     .prepare(
@@ -118,6 +156,9 @@ export function updateMerchantConfig(input: {
         android_auto_confirm = @android_auto_confirm,
         email_auto_confirm = @email_auto_confirm,
         single_slot_fifo = @single_slot_fifo,
+        hide_nx_chrome = @hide_nx_chrome,
+        whatsapp_otp_enabled = @whatsapp_otp_enabled,
+        whatsapp_otp_phone = @whatsapp_otp_phone,
         updated_at = @updated_at
       WHERE id = 1`
     )

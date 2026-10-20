@@ -36,6 +36,12 @@ const updateSchema = z.object({
   androidAutoConfirm: z.boolean().optional(),
   emailAutoConfirm: z.boolean().optional(),
   singleSlotFifo: z.boolean().optional(),
+  hideNxChrome: z.boolean().optional(),
+  whatsappOtpEnabled: z.boolean().optional(),
+  whatsappOtpPhone: z.preprocess(
+    (v) => (v === "" ? null : v),
+    z.string().min(10).max(20).nullable().optional()
+  ),
 });
 
 function publicConfig(config: ReturnType<typeof getMerchantConfig>) {
@@ -57,6 +63,10 @@ function publicConfig(config: ReturnType<typeof getMerchantConfig>) {
     emailAddress: config.emailAddress,
     emailConnectedAt: config.emailConnectedAt,
     singleSlotFifo: config.singleSlotFifo,
+    hideNxChrome: config.hideNxChrome,
+    whatsappOtpEnabled: config.whatsappOtpEnabled,
+    whatsappOtpPhone: config.whatsappOtpPhone,
+    whatsappVerifiedAt: config.whatsappVerifiedAt,
   };
 }
 

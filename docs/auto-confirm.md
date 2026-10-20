@@ -81,3 +81,21 @@ YAHOO_IMAP_HOST=
 ```
 
 Without Gmail OAuth, use **mock ingest** for end-to-end matching.
+
+---
+
+## WhatsApp OTP gate (Phase C)
+
+Optional buyer/merchant gate — **not** a payment verifier. Verification SoT remains SMS/Gmail parse + manual Confirm.
+
+```
+WHATSAPP_TOKEN=
+WHATSAPP_PHONE_ID=
+WHATSAPP_TEMPLATE_NAME=nxpayment_otp
+WHATSAPP_TEMPLATE_LANG=en
+WHATSAPP_OTP_TTL_MS=600000
+```
+
+- Unset token/phone id → **dry-run stub** (`mode: stub`, `stubCode` in send response).
+- Set both → Meta Graph `/{phone-number-id}/messages` template send.
+- Enable in Merchant Setup; checkout + onboarding UIs call `POST /api/otp/whatsapp/send` + `/verify`.

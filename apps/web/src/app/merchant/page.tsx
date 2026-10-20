@@ -52,6 +52,9 @@ export default function MerchantHome() {
           <Link href="/merchant/pending">Review pending</Link>
         </Button>
         <Button asChild size="lg" variant="outline">
+          <Link href="/merchant/till">Till desk</Link>
+        </Button>
+        <Button asChild size="lg" variant="outline">
           <Link href="/merchant/onboarding">VPA & branding</Link>
         </Button>
         <Button asChild size="lg" variant="ghost">

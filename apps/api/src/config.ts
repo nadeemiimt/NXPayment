@@ -38,4 +38,9 @@ export const config = {
   yahooClientId: process.env.YAHOO_CLIENT_ID ?? "",
   yahooClientSecret: process.env.YAHOO_CLIENT_SECRET ?? "",
   yahooImapHost: process.env.YAHOO_IMAP_HOST ?? "",
+  whatsappToken: process.env.WHATSAPP_TOKEN ?? "",
+  whatsappPhoneId: process.env.WHATSAPP_PHONE_ID ?? "",
+  whatsappTemplateName: process.env.WHATSAPP_TEMPLATE_NAME ?? "nxpayment_otp",
+  whatsappTemplateLang: process.env.WHATSAPP_TEMPLATE_LANG ?? "en",
+  whatsappOtpTtlMs: Number(process.env.WHATSAPP_OTP_TTL_MS ?? 10 * 60 * 1000),
 };

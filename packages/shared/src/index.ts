@@ -60,6 +60,8 @@ export function buildUpiUri(opts: {
   return `upi://pay?${params.toString()}`;
 }
 
+export type PaymentMethod = "upi" | "cash" | "card_counter";
+
 export interface PaymentDto {
   id: string;
   merchantOrderId: string | null;
@@ -77,17 +79,9 @@ export interface PaymentDto {
   confirmedAt: string | null;
   riskScore?: number;
   riskSignals?: Record<string, unknown> | null;
-}
-
-export interface TallyReport {
-  from: string;
-  to: string;
-  successCount: number;
-  failedCount: number;
-  expiredCount: number;
-  cancelledCount: number;
-  paymentCount: number;
-  totalSalesPaise: number;
+  /** upi (default) | cash | card_counter till desk */
+  method?: PaymentMethod;
+  railId?: string;
 }
 
 export interface MerchantConfigDto {
@@ -99,6 +93,22 @@ export interface MerchantConfigDto {
   logoUrl: string | null;
   webhookUrl: string | null;
   paymentTtlMs: number;
+  hideNxChrome?: boolean;
+  whatsappOtpEnabled?: boolean;
+  whatsappOtpPhone?: string | null;
+  whatsappVerifiedAt?: string | null;
+  singleSlotFifo?: boolean;
+}
+
+export interface TallyReport {
+  from: string;
+  to: string;
+  successCount: number;
+  failedCount: number;
+  expiredCount: number;
+  cancelledCount: number;
+  paymentCount: number;
+  totalSalesPaise: number;
 }
 
 /** Extension point — GST export (not implemented in MVP). */
