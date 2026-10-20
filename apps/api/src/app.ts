@@ -22,6 +22,25 @@ export async function buildApp(opts?: {
   });
   await app.register(sensible);
 
+  // Accept empty bodies with Content-Type: application/json (browser POSTs often omit `{}`)
+  app.removeContentTypeParser("application/json");
+  app.addContentTypeParser(
+    "application/json",
+    { parseAs: "string" },
+    (req, body, done) => {
+      const raw = typeof body === "string" ? body : "";
+      if (!raw || !raw.trim()) {
+        done(null, {});
+        return;
+      }
+      try {
+        done(null, JSON.parse(raw));
+      } catch (err) {
+        done(err as Error, undefined);
+      }
+    }
+  );
+
   getDb();
 
   app.get("/health", async () => ({ ok: true, service: "nxpayment-api" }));

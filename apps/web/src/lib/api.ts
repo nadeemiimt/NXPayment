@@ -75,14 +75,26 @@ function formatApiError(status: number, data: Record<string, unknown>): string {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const method = (init?.method ?? "GET").toUpperCase();
+  const headers: Record<string, string> = {
+    ...((init?.headers as Record<string, string> | undefined) ?? {}),
+  };
+  let body = init?.body;
+  // Fastify rejects Content-Type: application/json with an empty body.
+  if (body !== undefined && body !== null) {
+    headers["Content-Type"] = headers["Content-Type"] ?? "application/json";
+  } else if (method === "POST" || method === "PUT" || method === "PATCH") {
+    headers["Content-Type"] = "application/json";
+    body = "{}";
+  }
+
   let res: Response;
   try {
     res = await fetch(`${apiBase()}${path}`, {
       ...init,
-      headers: {
-        "Content-Type": "application/json",
-        ...(init?.headers ?? {}),
-      },
+      method,
+      headers,
+      body,
       cache: "no-store",
     });
   } catch {
@@ -132,11 +144,19 @@ export const api = {
     ),
   pending: () => request<{ payments: Payment[] }>("/api/payments/pending"),
   confirm: (id: string) =>
-    request<{ payment: Payment }>(`/api/payments/${id}/confirm`, { method: "POST" }),
+    request<{ payment: Payment }>(`/api/payments/${id}/confirm`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
   reject: (id: string, reason?: string) =>
     request<{ payment: Payment }>(`/api/payments/${id}/reject`, {
       method: "POST",
-      body: JSON.stringify({ reason }),
+      body: JSON.stringify(reason ? { reason } : {}),
+    }),
+  cancel: (id: string) =>
+    request<{ payment: Payment }>(`/api/payments/${id}/cancel`, {
+      method: "POST",
+      body: JSON.stringify({}),
     }),
   tally: () => request<{ tally: Tally }>("/api/reports/tally"),
   webhooks: () =>

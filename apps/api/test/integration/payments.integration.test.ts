@@ -131,6 +131,25 @@ describe("NXPayment API integration", () => {
     assert.ok((confirmed.body.payment as Json).confirmedAt);
   });
 
+  test("confirm accepts Content-Type JSON with empty body", async () => {
+    const created = await json(requireApp(), "POST", "/api/payments", {
+      amountPaise: 199,
+    });
+    assert.equal(created.status, 201);
+    const id = (created.body.payment as Json).id as string;
+
+    // Mimic browser fetch that sets application/json but sends no payload
+    const res = await requireApp().inject({
+      method: "POST",
+      url: `/api/payments/${id}/confirm`,
+      headers: { "content-type": "application/json" },
+      payload: "",
+    });
+    assert.equal(res.statusCode, 200);
+    const body = res.json() as { payment: Json };
+    assert.equal(body.payment.status, "SUCCESS");
+  });
+
   test("reject path → FAILED", async () => {
     const created = await json(requireApp(), "POST", "/api/payments", {
       amountPaise: 102,
