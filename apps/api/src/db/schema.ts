@@ -108,9 +108,15 @@ function migrate(database: Db) {
   ensureColumn(database, "merchant_config", "email_secret", "TEXT");
   ensureColumn(database, "merchant_config", "email_connected_at", "TEXT");
   ensureColumn(database, "merchant_config", "single_slot_fifo", "INTEGER NOT NULL DEFAULT 1");
+  ensureColumn(database, "merchant_config", "hide_nx_chrome", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(database, "merchant_config", "whatsapp_otp_enabled", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(database, "merchant_config", "whatsapp_otp_phone", "TEXT");
+  ensureColumn(database, "merchant_config", "whatsapp_verified_at", "TEXT");
 
   ensureColumn(database, "payments", "risk_score", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(database, "payments", "risk_signals", "TEXT");
+  ensureColumn(database, "payments", "method", "TEXT NOT NULL DEFAULT 'upi'");
+  ensureColumn(database, "payments", "rail_id", "TEXT NOT NULL DEFAULT 'upi_direct'");
 
   database.exec(`
     CREATE TABLE IF NOT EXISTS merchant_alerts (
@@ -124,6 +130,22 @@ function migrate(database: Db) {
       created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_alerts_created ON merchant_alerts(created_at);
+  `);
+
+  ensureColumn(database, "merchant_alerts", "dismissed", "INTEGER NOT NULL DEFAULT 0");
+
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS whatsapp_otp_challenges (
+      id TEXT PRIMARY KEY,
+      phone_e164 TEXT NOT NULL,
+      code_hash TEXT NOT NULL,
+      purpose TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      verified_at TEXT,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_otp_phone ON whatsapp_otp_challenges(phone_e164);
   `);
 
   const row = database.prepare("SELECT id FROM merchant_config WHERE id = 1").get();

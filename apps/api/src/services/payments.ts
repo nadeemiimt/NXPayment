@@ -37,6 +37,8 @@ interface PaymentRow {
   failure_reason: string | null;
   risk_score?: number | null;
   risk_signals?: string | null;
+  method?: string | null;
+  rail_id?: string | null;
 }
 
 function toDto(row: PaymentRow): PaymentDto {
@@ -48,6 +50,8 @@ function toDto(row: PaymentRow): PaymentDto {
       riskSignals = null;
     }
   }
+  const method =
+    row.method === "cash" || row.method === "card_counter" ? row.method : "upi";
   return {
     id: row.id,
     merchantOrderId: row.merchant_order_id,
@@ -65,6 +69,8 @@ function toDto(row: PaymentRow): PaymentDto {
     confirmedAt: row.confirmed_at,
     riskScore: row.risk_score ?? 0,
     riskSignals,
+    method,
+    railId: row.rail_id ?? (method === "upi" ? "upi_direct" : "till_desk"),
   };
 }
 
@@ -90,11 +96,14 @@ export class FifoSlotBusyError extends Error {
   }
 }
 
+/** In-progress UPI payments only (till cash/card do not occupy the FIFO slot). */
 export function findAnyInProgress(limit = 20): PaymentDto[] {
   const placeholders = IN_PROGRESS_STATUSES.map(() => "?").join(",");
   const rows = getDb()
     .prepare(
-      `SELECT * FROM payments WHERE status IN (${placeholders})
+      `SELECT * FROM payments
+       WHERE status IN (${placeholders})
+         AND COALESCE(method, 'upi') = 'upi'
        ORDER BY created_at ASC LIMIT ?`
     )
     .all(...IN_PROGRESS_STATUSES, limit) as PaymentRow[];

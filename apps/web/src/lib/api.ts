@@ -18,6 +18,8 @@ export type PaymentStatus =
   | "EXPIRED"
   | "CANCELLED";
 
+export type PaymentMethod = "upi" | "cash" | "card_counter";
+
 export interface Payment {
   id: string;
   merchantOrderId: string | null;
@@ -33,6 +35,9 @@ export interface Payment {
   updatedAt: string;
   expiresAt: string;
   confirmedAt: string | null;
+  riskScore?: number;
+  method?: PaymentMethod;
+  railId?: string;
 }
 
 export interface MerchantConfig {
@@ -52,6 +57,11 @@ export interface MerchantConfig {
   emailProvider?: string | null;
   emailAddress?: string | null;
   emailConnectedAt?: string | null;
+  singleSlotFifo?: boolean;
+  hideNxChrome?: boolean;
+  whatsappOtpEnabled?: boolean;
+  whatsappOtpPhone?: string | null;
+  whatsappVerifiedAt?: string | null;
 }
 
 export interface Tally {
@@ -239,10 +249,69 @@ export const api = {
     method: "POST",
     body: JSON.stringify(body),
   }),
-  listAlerts: () =>
-    request<{ alerts: Array<Record<string, unknown>> }>("/api/alerts"),
+  listAlerts: (opts?: { unreadOnly?: boolean }) =>
+    request<{
+      alerts: Array<Record<string, unknown>>;
+      unreadCount: number;
+    }>(`/api/alerts${opts?.unreadOnly ? "?unreadOnly=1" : ""}`),
   markAlertRead: (id: string) =>
-    request<{ ok: boolean }>(`/api/alerts/${id}/read`, {
+    request<{ ok: boolean; unreadCount: number }>(`/api/alerts/${id}/read`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
+  dismissAlert: (id: string) =>
+    request<{ ok: boolean; unreadCount: number }>(`/api/alerts/${id}/dismiss`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
+  markAllAlertsRead: () =>
+    request<{ ok: boolean; updated: number; unreadCount: number }>(
+      "/api/alerts/read-all",
+      { method: "POST", body: JSON.stringify({}) }
+    ),
+  whatsappOtpStatus: () =>
+    request<{
+      configured: boolean;
+      mode: "stub" | "meta_cloud";
+      templateName: string;
+      gateEnabled: boolean;
+      gatePhone: string | null;
+      onboardingVerifiedAt: string | null;
+    }>("/api/otp/whatsapp/status"),
+  sendWhatsAppOtp: (body: {
+    phoneE164: string;
+    purpose: "checkout_gate" | "onboarding_gate";
+  }) =>
+    request<{
+      ok: boolean;
+      mode: "stub" | "meta_cloud";
+      challengeId: string;
+      expiresAt: string;
+      stubCode?: string;
+      detail: string;
+    }>("/api/otp/whatsapp/send", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  verifyWhatsAppOtp: (body: { challengeId: string; code: string }) =>
+    request<{ ok: boolean; purpose?: string; detail: string }>(
+      "/api/otp/whatsapp/verify",
+      { method: "POST", body: JSON.stringify(body) }
+    ),
+  createTillSale: (body: {
+    amountPaise: number;
+    method: "cash" | "card_counter";
+    merchantOrderId?: string;
+    note?: string;
+    confirm?: boolean;
+  }) =>
+    request<{ payment: Payment }>("/api/till/sales", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  listOpenTill: () => request<{ payments: Payment[] }>("/api/till/open"),
+  confirmTillSale: (id: string) =>
+    request<{ payment: Payment }>(`/api/till/sales/${id}/confirm`, {
       method: "POST",
       body: JSON.stringify({}),
     }),

@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 const links = [
   { href: "/merchant", label: "Home" },
   { href: "/merchant/pending", label: "Confirm" },
+  { href: "/merchant/till", label: "Till" },
   { href: "/merchant/payments", label: "Payments" },
   { href: "/merchant/tally", label: "Tally" },
   { href: "/merchant/onboarding", label: "Setup" },
