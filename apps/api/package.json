@@ -11,7 +11,8 @@
     "start": "tsx src/index.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:integration": "node ./scripts/require-node20.mjs && node --import tsx --test test/integration/payments.integration.test.ts"
+    "test:integration": "node ./scripts/require-node20.mjs && node --import tsx --test test/integration/payments.integration.test.ts",
+    "test:gmail-oauth": "node ./scripts/require-node20.mjs && node --import tsx --test test/integration/gmail-oauth-secrets.integration.test.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.0.1",

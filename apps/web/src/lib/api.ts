@@ -213,7 +213,17 @@ export const api = {
     emailAddress: string;
     secret: string;
   }) =>
-    request<{ config: MerchantConfig; note?: string }>("/api/credits/email/connect", {
+    request<{
+      config: {
+        emailConnected: boolean;
+        emailProvider: string | null;
+        emailAddress: string | null;
+        emailConnectedAt: string | null;
+        emailAutoConfirm: boolean;
+        autoConfirmEnabled: boolean;
+      };
+      note: string;
+    }>("/api/credits/email/connect", {
       method: "POST",
       body: JSON.stringify(body),
     }),
@@ -315,6 +325,49 @@ export const api = {
     request<{ payment: Payment }>(`/api/till/sales/${id}/confirm`, {
       method: "POST",
       body: JSON.stringify({}),
+    }),
+  getGmailOAuth: () =>
+    request<{
+      gmailOAuth: {
+        configured: boolean;
+        source: "db" | "env" | "none";
+        clientIdConfigured: boolean;
+        clientSecretConfigured: boolean;
+        clientIdLast4: string | null;
+        clientSecretLast4: string | null;
+        redirectUris: string[];
+        javascriptOrigins: string[];
+        defaultRedirectUri: string;
+        encryption: {
+          mode: string;
+          keySource: string;
+          note: string;
+        };
+        updatedAt: string | null;
+      };
+    }>("/api/merchant/gmail-oauth"),
+  updateGmailOAuth: (body: {
+    clientId?: string;
+    clientSecret?: string;
+    redirectUris?: string[];
+    javascriptOrigins?: string[];
+    webClientJson?: unknown;
+  }) =>
+    request<{ gmailOAuth: Record<string, unknown> }>("/api/merchant/gmail-oauth", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  revealGmailOAuth: () =>
+    request<{
+      gmailOAuth: {
+        clientId: string | null;
+        clientSecret: string | null;
+        source: "db" | "env" | "none";
+      };
+    }>("/api/merchant/gmail-oauth/reveal"),
+  clearGmailOAuth: () =>
+    request<{ gmailOAuth: Record<string, unknown> }>("/api/merchant/gmail-oauth", {
+      method: "DELETE",
     }),
 };
 

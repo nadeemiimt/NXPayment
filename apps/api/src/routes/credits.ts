@@ -111,25 +111,93 @@ export async function creditRoutes(app: FastifyInstance) {
   app.post("/api/credits/email/connect", async (req, reply) => {
     const schema = z.object({
       provider: z.enum(["gmail", "yahoo", "mock"]),
-      emailAddress: z.string().email(),
+      emailAddress: z.string().trim().email(),
       /** OAuth refresh token, IMAP app password, or "mock" */
       secret: z.string().min(1).max(2048),
     });
-    const parsed = schema.safeParse(req.body);
+    const parsed = schema.safeParse(req.body ?? {});
     if (!parsed.success) {
-      return reply.code(400).send({ error: "invalid_body", details: parsed.error.flatten() });
+      return reply.code(400).send({
+        error: "invalid_body",
+        message: "Enter a valid mailbox email and secret.",
+        details: parsed.error.flatten(),
+      });
     }
-    if (parsed.data.provider === "gmail" && !gmailOAuthConfigured()) {
-      // Allow connect for docs/dev; live Gmail list needs OAuth app env
-      // Secret may be app-password placeholder until OAuth is configured
+
+    const provider = parsed.data.provider;
+    const emailAddress = parsed.data.emailAddress.trim().toLowerCase();
+    const secret = parsed.data.secret.trim();
+    const domain = emailAddress.includes("@") ? emailAddress.split("@").pop() ?? "" : "";
+    const blockedDomains = new Set([
+      "example.com",
+      "example.org",
+      "example.net",
+      "localhost",
+      "test.com",
+      "invalid",
+    ]);
+    const fakeSecrets = new Set(["mock", "fake-refresh", "fake", "test", "password", "secret"]);
+
+    if (!emailAddress || blockedDomains.has(domain) || domain.endsWith(".example.com")) {
+      return reply.code(400).send({
+        error: "invalid_email",
+        message:
+          "Use a real mailbox address — not test@example.com, example.com, or localhost.",
+      });
     }
-    const configDto = connectEmailMailbox(parsed.data);
+
+    if (provider === "gmail") {
+      if (domain !== "gmail.com" && domain !== "googlemail.com") {
+        return reply.code(400).send({
+          error: "invalid_gmail_address",
+          message: "Gmail provider requires a @gmail.com or @googlemail.com address.",
+        });
+      }
+      if (!secret || fakeSecrets.has(secret.toLowerCase())) {
+        return reply.code(400).send({
+          error: "invalid_gmail_secret",
+          message:
+            "Paste the real Gmail OAuth refresh token (not mock / fake-refresh). Use the mock tab for sample ingest.",
+        });
+      }
+    }
+
+    if (provider === "yahoo" && (!secret || fakeSecrets.has(secret.toLowerCase()))) {
+      return reply.code(400).send({
+        error: "invalid_secret",
+        message: "Enter a real Yahoo credential (not mock / fake-refresh).",
+      });
+    }
+
+    // Persist mailbox email + refresh token / app password / mock secret in SQLite.
+    // Live Gmail list still needs OAuth app credentials; connect must succeed either way.
+    const configDto = connectEmailMailbox({
+      provider,
+      emailAddress,
+      secret: provider === "mock" ? secret || "mock" : secret,
+    });
+    let note = "Mailbox connected";
+    if (provider === "gmail") {
+      note = gmailOAuthConfigured()
+        ? "Mailbox connected — polling will use this refresh token."
+        : "Mailbox connected — credentials saved. Gmail OAuth Client ID/Secret not configured yet (save above or set GMAIL_CLIENT_*); live list may be empty until then. Mock ingest still works.";
+    } else if (provider === "yahoo") {
+      note = yahooOAuthConfigured()
+        ? "Mailbox connected — polling will use this credential."
+        : "Mailbox connected — credentials saved. Yahoo OAuth/IMAP not fully configured; mock ingest still works.";
+    } else {
+      note = "Mailbox connected — mock inbox ready for sample ingest.";
+    }
     return {
-      config: configDto,
-      note:
-        parsed.data.provider === "gmail" && !gmailOAuthConfigured()
-          ? "GMAIL_CLIENT_ID/SECRET not set — live Gmail poll returns empty until OAuth is configured. Use mock ingest or paste samples for now."
-          : undefined,
+      config: {
+        emailConnected: configDto.emailConnected,
+        emailProvider: configDto.emailProvider,
+        emailAddress: configDto.emailAddress,
+        emailConnectedAt: configDto.emailConnectedAt,
+        emailAutoConfirm: configDto.emailAutoConfirm,
+        autoConfirmEnabled: configDto.autoConfirmEnabled,
+      },
+      note,
     };
   });
 

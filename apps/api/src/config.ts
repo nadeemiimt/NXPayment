@@ -39,6 +39,15 @@ export const config = {
   gmailRedirectUri:
     process.env.GMAIL_REDIRECT_URI ??
     `http://127.0.0.1:${process.env.API_PORT ?? 3847}/api/oauth/google/callback`,
+  /**
+   * Key for encrypting merchant secrets at rest (AES-256-GCM).
+   * Prefer SECRETS_KEY; falls back to ADMIN_TOKEN so each install can rotate.
+   * If neither is strong/unique, ciphertext is still better than plaintext — protect the DB file.
+   */
+  secretsKey:
+    process.env.SECRETS_KEY?.trim() ||
+    process.env.ADMIN_TOKEN?.trim() ||
+    "dev-secrets-key",
 
   yahooClientId: process.env.YAHOO_CLIENT_ID ?? "",
   yahooClientSecret: process.env.YAHOO_CLIENT_SECRET ?? "",

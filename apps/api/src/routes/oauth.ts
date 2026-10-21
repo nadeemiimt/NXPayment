@@ -41,7 +41,7 @@ export async function oauthRoutes(app: FastifyInstance) {
       return reply.code(503).send({
         error: "gmail_oauth_not_configured",
         message:
-          "Set GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET, then reconnect. Callback URI is ready.",
+          "Configure Gmail OAuth Client ID/Secret in Merchant Auto-confirm (or set GMAIL_CLIENT_ID/SECRET env), then reconnect. Callback URI is ready.",
         redirectUri: config.gmailRedirectUri,
       });
     }

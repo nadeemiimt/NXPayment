@@ -7,6 +7,10 @@ data/*.sqlite-*
 *.log
 .local/
 .DS_Store
+# Google OAuth client JSON / secrets — never commit
+*clientsecret*.json
+**/gmailclientsecret.json
+**/client_secret*.json
 apps/mobile/.dart_tool/
 apps/mobile/build/
 apps/mobile/.flutter-plugins

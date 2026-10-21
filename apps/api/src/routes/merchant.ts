@@ -2,6 +2,12 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { mastercardPartnerRail, visaPartnerRail } from "../rails/card-stubs.js";
 import { upiDirectRail } from "../rails/upi-direct.js";
+import {
+  clearGmailOAuthCredentials,
+  getGmailOAuthMaskedStatus,
+  revealGmailOAuthCredentials,
+  upsertGmailOAuthCredentials,
+} from "../services/gmail-oauth-credentials.js";
 import { getMerchantConfig, updateMerchantConfig } from "../services/merchant.js";
 import { listWebhookDeliveries } from "../services/webhooks.js";
 
@@ -86,6 +92,59 @@ export async function merchantRoutes(app: FastifyInstance) {
 
   app.get("/api/merchant/webhooks", async () => {
     return { deliveries: listWebhookDeliveries() };
+  });
+
+  /**
+   * Merchant Gmail OAuth app credentials (Google Cloud "Web application" client).
+   * GET never returns raw secrets — only configured/last4/mask indicators.
+   */
+  app.get("/api/merchant/gmail-oauth", async () => {
+    return { gmailOAuth: getGmailOAuthMaskedStatus() };
+  });
+
+  app.put("/api/merchant/gmail-oauth", async (req, reply) => {
+    const schema = z.object({
+      clientId: z.string().min(8).max(256).optional(),
+      clientSecret: z.string().min(8).max(256).optional(),
+      redirectUris: z.array(z.string().url()).max(20).optional(),
+      javascriptOrigins: z.array(z.string().url()).max(20).optional(),
+      /** Paste of Google client JSON: { "web": { client_id, client_secret, ... } } */
+      webClientJson: z.unknown().optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "invalid_body", details: parsed.error.flatten() });
+    }
+    try {
+      const gmailOAuth = upsertGmailOAuthCredentials(parsed.data);
+      // Never echo clientSecret / clientId in the response.
+      return { gmailOAuth };
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "update_failed";
+      if (code === "invalid_web_client_json") {
+        return reply.code(400).send({
+          error: "invalid_web_client_json",
+          message: 'Expected Google client JSON with a "web" object (client_id / client_secret).',
+        });
+      }
+      if (code === "nothing_to_update") {
+        return reply.code(400).send({
+          error: "nothing_to_update",
+          message: "Provide clientId, clientSecret, and/or webClientJson.",
+        });
+      }
+      return reply.code(500).send({ error: "update_failed" });
+    }
+  });
+
+  /** Reveal plaintext for Copy-to-clipboard in merchant admin UI (single-tenant MVP). */
+  app.get("/api/merchant/gmail-oauth/reveal", async () => {
+    const revealed = revealGmailOAuthCredentials();
+    return { gmailOAuth: revealed };
+  });
+
+  app.delete("/api/merchant/gmail-oauth", async () => {
+    return { gmailOAuth: clearGmailOAuthCredentials() };
   });
 
   app.get("/api/rails", async () => {
