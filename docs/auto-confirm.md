@@ -74,11 +74,28 @@ Changes for NXPayment: number paise (not bigint), single Fastify API (not separa
 ```
 GMAIL_CLIENT_ID=
 GMAIL_CLIENT_SECRET=
+GMAIL_REDIRECT_URI=http://127.0.0.1:3847/api/oauth/google/callback
 EMAIL_POLL_MS=30000
 YAHOO_CLIENT_ID=
 YAHOO_CLIENT_SECRET=
 YAHOO_IMAP_HOST=
 ```
+
+### Google Cloud Console (local `dev:up`)
+
+Register these **exactly** on the OAuth 2.0 Client (Web application):
+
+**Authorized redirect URIs**
+
+- `http://127.0.0.1:3847/api/oauth/google/callback`
+- `http://localhost:3847/api/oauth/google/callback` (optional alias)
+
+**Authorized JavaScript origins**
+
+- `http://127.0.0.1:4321`
+- `http://localhost:4321` (optional alias)
+
+API listens on **3847**; Web on **4321**. Callback route: `GET /api/oauth/google/callback`.
 
 Without Gmail OAuth, use **mock ingest** for end-to-end matching.
 

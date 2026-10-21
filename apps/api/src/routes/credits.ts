@@ -88,6 +88,7 @@ export async function creditRoutes(app: FastifyInstance) {
       gmailOAuthConfigured: gmailOAuthConfigured(),
       yahooOAuthConfigured: yahooOAuthConfigured(),
       yahooImapHost: Boolean(config.yahooImapHost),
+      gmailRedirectUri: config.gmailRedirectUri,
       primaryVerification:
         "Bank SMS & Gmail alerts parsed in near real time — not aggregator webhooks",
     };

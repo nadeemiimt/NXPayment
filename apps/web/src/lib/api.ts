@@ -196,6 +196,7 @@ export const api = {
       emailAddress: string | null;
       gmailOAuthConfigured: boolean;
       yahooOAuthConfigured: boolean;
+      gmailRedirectUri?: string;
       primaryVerification: string;
     }>("/api/credits/email/status"),
   updateCreditSettings: (body: {
