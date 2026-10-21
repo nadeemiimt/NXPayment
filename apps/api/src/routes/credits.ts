@@ -111,18 +111,71 @@ export async function creditRoutes(app: FastifyInstance) {
   app.post("/api/credits/email/connect", async (req, reply) => {
     const schema = z.object({
       provider: z.enum(["gmail", "yahoo", "mock"]),
-      emailAddress: z.string().email(),
+      emailAddress: z.string().trim().email(),
       /** OAuth refresh token, IMAP app password, or "mock" */
       secret: z.string().min(1).max(2048),
     });
     const parsed = schema.safeParse(req.body ?? {});
     if (!parsed.success) {
-      return reply.code(400).send({ error: "invalid_body", details: parsed.error.flatten() });
+      return reply.code(400).send({
+        error: "invalid_body",
+        message: "Enter a valid mailbox email and secret.",
+        details: parsed.error.flatten(),
+      });
     }
+
+    const provider = parsed.data.provider;
+    const emailAddress = parsed.data.emailAddress.trim().toLowerCase();
+    const secret = parsed.data.secret.trim();
+    const domain = emailAddress.includes("@") ? emailAddress.split("@").pop() ?? "" : "";
+    const blockedDomains = new Set([
+      "example.com",
+      "example.org",
+      "example.net",
+      "localhost",
+      "test.com",
+      "invalid",
+    ]);
+    const fakeSecrets = new Set(["mock", "fake-refresh", "fake", "test", "password", "secret"]);
+
+    if (!emailAddress || blockedDomains.has(domain) || domain.endsWith(".example.com")) {
+      return reply.code(400).send({
+        error: "invalid_email",
+        message:
+          "Use a real mailbox address — not test@example.com, example.com, or localhost.",
+      });
+    }
+
+    if (provider === "gmail") {
+      if (domain !== "gmail.com" && domain !== "googlemail.com") {
+        return reply.code(400).send({
+          error: "invalid_gmail_address",
+          message: "Gmail provider requires a @gmail.com or @googlemail.com address.",
+        });
+      }
+      if (!secret || fakeSecrets.has(secret.toLowerCase())) {
+        return reply.code(400).send({
+          error: "invalid_gmail_secret",
+          message:
+            "Paste the real Gmail OAuth refresh token (not mock / fake-refresh). Use the mock tab for sample ingest.",
+        });
+      }
+    }
+
+    if (provider === "yahoo" && (!secret || fakeSecrets.has(secret.toLowerCase()))) {
+      return reply.code(400).send({
+        error: "invalid_secret",
+        message: "Enter a real Yahoo credential (not mock / fake-refresh).",
+      });
+    }
+
     // Persist mailbox email + refresh token / app password / mock secret in SQLite.
     // Live Gmail list still needs OAuth app credentials; connect must succeed either way.
-    const configDto = connectEmailMailbox(parsed.data);
-    const provider = parsed.data.provider;
+    const configDto = connectEmailMailbox({
+      provider,
+      emailAddress,
+      secret: provider === "mock" ? secret || "mock" : secret,
+    });
     let note = "Mailbox connected";
     if (provider === "gmail") {
       note = gmailOAuthConfigured()

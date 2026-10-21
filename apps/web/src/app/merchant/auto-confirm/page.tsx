@@ -24,6 +24,43 @@ function connectedBannerText(provider: string | null, address: string | null): s
   return `Mailbox connected: ${p} · ${a}`;
 }
 
+const BLOCKED_EMAIL_DOMAINS = new Set([
+  "example.com",
+  "example.org",
+  "example.net",
+  "localhost",
+  "test.com",
+  "invalid",
+]);
+const FAKE_SECRETS = new Set(["mock", "fake-refresh", "fake", "test", "password", "secret"]);
+
+function validateConnectInput(
+  provider: "gmail" | "yahoo" | "mock",
+  emailAddress: string,
+  token: string
+): string | null {
+  if (!emailAddress) return "Enter the mailbox email address.";
+  const at = emailAddress.indexOf("@");
+  if (at < 1 || at === emailAddress.length - 1) return "Enter a valid email address.";
+  const domain = emailAddress.slice(at + 1).toLowerCase();
+  if (BLOCKED_EMAIL_DOMAINS.has(domain) || domain.endsWith(".example.com")) {
+    return "Use a real mailbox address — not test@example.com or example.com.";
+  }
+  if (provider === "gmail") {
+    if (domain !== "gmail.com" && domain !== "googlemail.com") {
+      return "Gmail provider requires a @gmail.com or @googlemail.com address.";
+    }
+    if (!token || FAKE_SECRETS.has(token.toLowerCase())) {
+      return "Paste the real Gmail OAuth refresh token (not mock / fake-refresh).";
+    }
+  } else if (provider === "yahoo") {
+    if (!token || FAKE_SECRETS.has(token.toLowerCase())) {
+      return "Enter a real Yahoo credential (not mock / fake-refresh).";
+    }
+  }
+  return null;
+}
+
 export default function AutoConfirmPage() {
   const [status, setStatus] = useState<EmailStatus | null>(null);
   const [email, setEmail] = useState("");
@@ -61,16 +98,19 @@ export default function AutoConfirmPage() {
   useEffect(() => {
     refresh()
       .then((s) => {
-        if (s.emailAddress) setEmail(s.emailAddress);
+        if (s.emailConnected && s.emailAddress) {
+          setEmail(s.emailAddress);
+          setMessage(connectedBannerText(s.emailProvider, s.emailAddress));
+        } else {
+          setEmail("");
+          setMessage(null);
+        }
         if (
           s.emailProvider === "gmail" ||
           s.emailProvider === "yahoo" ||
           s.emailProvider === "mock"
         ) {
           setProvider(s.emailProvider);
-        }
-        if (s.emailConnected && s.emailAddress) {
-          setMessage(connectedBannerText(s.emailProvider, s.emailAddress));
         }
       })
       .catch((e) =>
@@ -93,18 +133,11 @@ export default function AutoConfirmPage() {
   }
 
   async function connect() {
-    const emailAddress = email.trim();
+    const emailAddress = email.trim().toLowerCase();
     const token = secret.trim() || (provider === "mock" ? "mock" : "");
-    if (!emailAddress) {
-      setError("Enter the mailbox email address.");
-      return;
-    }
-    if (!token) {
-      setError(
-        provider === "gmail"
-          ? "Enter the Gmail OAuth refresh token."
-          : "Enter the mailbox secret (refresh token or app password)."
-      );
+    const validationError = validateConnectInput(provider, emailAddress, token);
+    if (validationError) {
+      setError(validationError);
       return;
     }
     setBusy(true);
@@ -250,6 +283,10 @@ export default function AutoConfirmPage() {
           token in the app DB. Live Gmail API polling also needs OAuth app credentials above
           (or <code className="text-xs">GMAIL_CLIENT_*</code> env). Until then use{" "}
           <strong>mock</strong> + paste a bank alert sample below.
+        </p>
+        <p className="text-sm text-[var(--nx-ink)]">
+          Use the Gmail that receives bank alerts (e.g. nadeemiimt@gmail.com), not a test
+          address.
         </p>
         {error && (
           <p
