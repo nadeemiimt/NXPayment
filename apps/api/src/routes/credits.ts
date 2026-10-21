@@ -115,21 +115,36 @@ export async function creditRoutes(app: FastifyInstance) {
       /** OAuth refresh token, IMAP app password, or "mock" */
       secret: z.string().min(1).max(2048),
     });
-    const parsed = schema.safeParse(req.body);
+    const parsed = schema.safeParse(req.body ?? {});
     if (!parsed.success) {
       return reply.code(400).send({ error: "invalid_body", details: parsed.error.flatten() });
     }
-    if (parsed.data.provider === "gmail" && !gmailOAuthConfigured()) {
-      // Allow connect for docs/dev; live Gmail list needs OAuth app env
-      // Secret may be app-password placeholder until OAuth is configured
-    }
+    // Persist mailbox email + refresh token / app password / mock secret in SQLite.
+    // Live Gmail list still needs OAuth app credentials; connect must succeed either way.
     const configDto = connectEmailMailbox(parsed.data);
+    const provider = parsed.data.provider;
+    let note = "Mailbox connected";
+    if (provider === "gmail") {
+      note = gmailOAuthConfigured()
+        ? "Mailbox connected — polling will use this refresh token."
+        : "Mailbox connected — credentials saved. Gmail OAuth Client ID/Secret not configured yet (save above or set GMAIL_CLIENT_*); live list may be empty until then. Mock ingest still works.";
+    } else if (provider === "yahoo") {
+      note = yahooOAuthConfigured()
+        ? "Mailbox connected — polling will use this credential."
+        : "Mailbox connected — credentials saved. Yahoo OAuth/IMAP not fully configured; mock ingest still works.";
+    } else {
+      note = "Mailbox connected — mock inbox ready for sample ingest.";
+    }
     return {
-      config: configDto,
-      note:
-        parsed.data.provider === "gmail" && !gmailOAuthConfigured()
-          ? "Gmail OAuth Client ID/Secret not configured (Merchant Auto-confirm or GMAIL_CLIENT_* env) — live Gmail poll returns empty. Use mock ingest or paste samples for now."
-          : undefined,
+      config: {
+        emailConnected: configDto.emailConnected,
+        emailProvider: configDto.emailProvider,
+        emailAddress: configDto.emailAddress,
+        emailConnectedAt: configDto.emailConnectedAt,
+        emailAutoConfirm: configDto.emailAutoConfirm,
+        autoConfirmEnabled: configDto.autoConfirmEnabled,
+      },
+      note,
     };
   });
 

@@ -213,7 +213,17 @@ export const api = {
     emailAddress: string;
     secret: string;
   }) =>
-    request<{ config: MerchantConfig; note?: string }>("/api/credits/email/connect", {
+    request<{
+      config: {
+        emailConnected: boolean;
+        emailProvider: string | null;
+        emailAddress: string | null;
+        emailConnectedAt: string | null;
+        emailAutoConfirm: boolean;
+        autoConfirmEnabled: boolean;
+      };
+      note: string;
+    }>("/api/credits/email/connect", {
       method: "POST",
       body: JSON.stringify(body),
     }),

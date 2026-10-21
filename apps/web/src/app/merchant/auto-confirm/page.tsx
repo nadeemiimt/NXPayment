@@ -18,6 +18,12 @@ type EmailStatus = {
   primaryVerification: string;
 };
 
+function connectedBannerText(provider: string | null, address: string | null): string {
+  const p = provider?.trim() || "mailbox";
+  const a = address?.trim() || "unknown";
+  return `Mailbox connected: ${p} · ${a}`;
+}
+
 export default function AutoConfirmPage() {
   const [status, setStatus] = useState<EmailStatus | null>(null);
   const [email, setEmail] = useState("");
@@ -32,16 +38,44 @@ export default function AutoConfirmPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [connecting, setConnecting] = useState(false);
 
   async function refresh() {
     const s = await api.creditEmailStatus();
-    setStatus(s);
+    setStatus({
+      autoConfirmEnabled: Boolean(s.autoConfirmEnabled),
+      androidAutoConfirm: Boolean(s.androidAutoConfirm),
+      emailAutoConfirm: Boolean(s.emailAutoConfirm),
+      emailConnected: Boolean(s.emailConnected),
+      emailProvider: s.emailProvider ?? null,
+      emailAddress: s.emailAddress ?? null,
+      gmailOAuthConfigured: Boolean(s.gmailOAuthConfigured),
+      yahooOAuthConfigured: Boolean(s.yahooOAuthConfigured),
+      primaryVerification:
+        s.primaryVerification ??
+        "Bank SMS & Gmail alerts parsed in near real time — not aggregator webhooks",
+    });
+    return s;
   }
 
   useEffect(() => {
-    refresh().catch((e) =>
-      setError(e instanceof Error ? e.message : "Failed to load status")
-    );
+    refresh()
+      .then((s) => {
+        if (s.emailAddress) setEmail(s.emailAddress);
+        if (
+          s.emailProvider === "gmail" ||
+          s.emailProvider === "yahoo" ||
+          s.emailProvider === "mock"
+        ) {
+          setProvider(s.emailProvider);
+        }
+        if (s.emailConnected && s.emailAddress) {
+          setMessage(connectedBannerText(s.emailProvider, s.emailAddress));
+        }
+      })
+      .catch((e) =>
+        setError(e instanceof Error ? e.message : "Failed to load status")
+      );
   }, []);
 
   async function toggle(field: "autoConfirmEnabled" | "androidAutoConfirm" | "emailAutoConfirm") {
@@ -51,7 +85,6 @@ export default function AutoConfirmPage() {
     try {
       await api.updateCreditSettings({ [field]: !status[field] });
       await refresh();
-      setMessage("Settings saved.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed");
     } finally {
@@ -60,18 +93,79 @@ export default function AutoConfirmPage() {
   }
 
   async function connect() {
+    const emailAddress = email.trim();
+    const token = secret.trim() || (provider === "mock" ? "mock" : "");
+    if (!emailAddress) {
+      setError("Enter the mailbox email address.");
+      return;
+    }
+    if (!token) {
+      setError(
+        provider === "gmail"
+          ? "Enter the Gmail OAuth refresh token."
+          : "Enter the mailbox secret (refresh token or app password)."
+      );
+      return;
+    }
     setBusy(true);
+    setConnecting(true);
     setError(null);
     try {
       const res = await api.connectEmail({
         provider,
-        emailAddress: email.trim(),
-        secret: secret.trim() || "mock",
+        emailAddress,
+        secret: token,
       });
-      setMessage(res.note ?? "Mailbox linked.");
-      await refresh();
+      const nextProvider = res.config.emailProvider ?? provider;
+      const nextAddress = res.config.emailAddress ?? emailAddress;
+      // Apply connect response immediately so the banner does not depend on a follow-up GET.
+      setStatus((prev) => ({
+        autoConfirmEnabled: Boolean(res.config.autoConfirmEnabled ?? prev?.autoConfirmEnabled),
+        androidAutoConfirm: Boolean(prev?.androidAutoConfirm),
+        emailAutoConfirm: Boolean(res.config.emailAutoConfirm ?? prev?.emailAutoConfirm ?? true),
+        emailConnected: Boolean(res.config.emailConnected),
+        emailProvider: nextProvider,
+        emailAddress: nextAddress,
+        gmailOAuthConfigured: Boolean(prev?.gmailOAuthConfigured),
+        yahooOAuthConfigured: Boolean(prev?.yahooOAuthConfigured),
+        primaryVerification:
+          prev?.primaryVerification ??
+          "Bank SMS & Gmail alerts parsed in near real time — not aggregator webhooks",
+      }));
+      setMessage(connectedBannerText(nextProvider, nextAddress));
+      setSecret("");
+      // Refresh in background to sync toggles / OAuth flags; never clear the banner on soft failure.
+      void refresh().catch(() => {
+        /* keep connect success UI */
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Connect failed");
+    } finally {
+      setConnecting(false);
+      setBusy(false);
+    }
+  }
+
+  async function disconnect() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.disconnectEmail();
+      setMessage(null);
+      setStatus((prev) =>
+        prev
+          ? {
+              ...prev,
+              emailConnected: false,
+              emailProvider: null,
+              emailAddress: null,
+              emailAutoConfirm: false,
+            }
+          : prev
+      );
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Disconnect failed");
     } finally {
       setBusy(false);
     }
@@ -97,6 +191,14 @@ export default function AutoConfirmPage() {
     }
   }
 
+  const showConnected =
+    Boolean(status?.emailConnected) && Boolean(status?.emailAddress);
+  const banner =
+    message ??
+    (showConnected
+      ? connectedBannerText(status?.emailProvider ?? null, status?.emailAddress ?? null)
+      : null);
+
   return (
     <div className="max-w-2xl space-y-8">
       <div>
@@ -107,13 +209,6 @@ export default function AutoConfirmPage() {
           remains available.
         </p>
       </div>
-
-      {error && (
-        <p role="alert" className="rounded-md border border-[#9B2C2C]/40 bg-[#9B2C2C]/10 px-3 py-2 text-sm text-[#9B2C2C]">
-          {error}
-        </p>
-      )}
-      {message && <p className="text-sm text-[var(--nx-accent)]">{message}</p>}
 
       {status && (
         <div className="space-y-3 rounded-md border border-[var(--nx-line)] p-4">
@@ -143,11 +238,6 @@ export default function AutoConfirmPage() {
               : "not set (mock/ingest OK)"}{" "}
             · Yahoo OAuth: {status.yahooOAuthConfigured ? "configured" : "not set"}
           </p>
-          {status.emailConnected && (
-            <p className="text-sm">
-              Connected: {status.emailProvider} · {status.emailAddress}
-            </p>
-          )}
         </div>
       )}
 
@@ -156,10 +246,28 @@ export default function AutoConfirmPage() {
       <section className="space-y-3">
         <h2 className="font-display text-xl font-semibold">Connect mailbox</h2>
         <p className="text-sm text-[var(--nx-muted)]">
-          Gmail is the primary email path. Live Gmail API polling needs OAuth app credentials
-          above (or <code className="text-xs">GMAIL_CLIENT_*</code> env). Until then use{" "}
+          Gmail is the primary email path. Saving here stores the mailbox email and refresh
+          token in the app DB. Live Gmail API polling also needs OAuth app credentials above
+          (or <code className="text-xs">GMAIL_CLIENT_*</code> env). Until then use{" "}
           <strong>mock</strong> + paste a bank alert sample below.
         </p>
+        {error && (
+          <p
+            role="alert"
+            className="rounded-md border border-[#9B2C2C]/40 bg-[#9B2C2C]/10 px-3 py-2 text-sm text-[#9B2C2C]"
+          >
+            {error}
+          </p>
+        )}
+        {banner && (
+          <p
+            role="status"
+            data-testid="mailbox-connected-banner"
+            className="rounded-md border border-[#0B6E4F] bg-[#E6F4EF] px-3 py-2 text-sm font-medium text-[#08553C]"
+          >
+            {banner}
+          </p>
+        )}
         <div className="flex flex-wrap gap-2">
           {(["gmail", "yahoo", "mock"] as const).map((p) => (
             <Button
@@ -167,6 +275,7 @@ export default function AutoConfirmPage() {
               type="button"
               variant={provider === p ? "default" : "outline"}
               size="sm"
+              disabled={busy}
               onClick={() => setProvider(p)}
             >
               {p}
@@ -176,24 +285,27 @@ export default function AutoConfirmPage() {
         <Input
           placeholder="merchant@gmail.com"
           value={email}
+          autoComplete="off"
+          disabled={busy}
           onChange={(e) => setEmail(e.target.value)}
         />
         <Input
           placeholder="OAuth refresh token / IMAP app password / mock"
           value={secret}
+          type="password"
+          autoComplete="off"
+          spellCheck={false}
+          disabled={busy}
           onChange={(e) => setSecret(e.target.value)}
         />
-        <Button type="button" disabled={busy || !email.trim()} onClick={() => void connect()}>
-          Connect {provider}
-        </Button>
         <Button
           type="button"
-          variant="outline"
-          disabled={busy}
-          onClick={() =>
-            void api.disconnectEmail().then(refresh).catch((e) => setError(String(e)))
-          }
+          disabled={busy || !email.trim()}
+          onClick={() => void connect()}
         >
+          {connecting ? "Connecting…" : `Connect ${provider}`}
+        </Button>
+        <Button type="button" variant="outline" disabled={busy} onClick={() => void disconnect()}>
           Disconnect
         </Button>
       </section>
