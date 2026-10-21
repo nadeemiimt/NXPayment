@@ -10,6 +10,12 @@ import path from "node:path";
 import { after, before, describe, test } from "node:test";
 import type { FastifyInstance } from "fastify";
 
+function expectedLast4(value: string): string {
+  const body = value.replace(/\.apps\.googleusercontent\.com$/i, "");
+  const base = body.length >= 4 ? body : value;
+  return base.length <= 4 ? base : base.slice(-4);
+}
+
 const nodeMajor = Number(process.versions.node.split(".")[0]);
 if (!Number.isFinite(nodeMajor) || nodeMajor < 20) {
   throw new Error(
@@ -132,8 +138,8 @@ describe("Gmail OAuth merchant secrets", () => {
     assert.equal(gmailOAuth.source, "db");
     assert.equal(gmailOAuth.clientIdConfigured, true);
     assert.equal(gmailOAuth.clientSecretConfigured, true);
-    assert.equal(gmailOAuth.clientIdLast4, FIXTURE_CLIENT_ID.slice(-4));
-    assert.equal(gmailOAuth.clientSecretLast4, FIXTURE_CLIENT_SECRET.slice(-4));
+    assert.equal(gmailOAuth.clientIdLast4, expectedLast4(FIXTURE_CLIENT_ID));
+    assert.equal(gmailOAuth.clientSecretLast4, expectedLast4(FIXTURE_CLIENT_SECRET));
     assert.equal((gmailOAuth.encryption as Json).mode, "aes-256-gcm");
 
     const get = await json(app, "GET", "/api/merchant/gmail-oauth");
@@ -159,8 +165,8 @@ describe("Gmail OAuth merchant secrets", () => {
     assert.equal(put.status, 200);
     assertNoLeak(put.body, [altId, altSecret, FIXTURE_CLIENT_SECRET]);
     const gmailOAuth = put.body.gmailOAuth as Json;
-    assert.equal(gmailOAuth.clientIdLast4, altId.slice(-4));
-    assert.equal(gmailOAuth.clientSecretLast4, altSecret.slice(-4));
+    assert.equal(gmailOAuth.clientIdLast4, expectedLast4(altId));
+    assert.equal(gmailOAuth.clientSecretLast4, expectedLast4(altSecret));
     const uris = gmailOAuth.redirectUris as string[];
     assert.ok(uris.includes("http://127.0.0.1:3847/api/oauth/google/callback"));
   });
@@ -208,7 +214,7 @@ describe("Gmail OAuth merchant secrets", () => {
     assert.equal(get.status, 200);
     assert.equal((get.body.gmailOAuth as Json).configured, true);
     assert.equal((get.body.gmailOAuth as Json).source, "env");
-    assert.equal((get.body.gmailOAuth as Json).clientIdLast4, envId.slice(-4));
+    assert.equal((get.body.gmailOAuth as Json).clientIdLast4, expectedLast4(envId));
     assertNoLeak(get.body, [envId, envSecret]);
 
     const status = await json(app, "GET", "/api/credits/email/status");
