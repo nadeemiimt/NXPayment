@@ -132,6 +132,20 @@ function migrate(database: Db) {
     CREATE INDEX IF NOT EXISTS idx_alerts_created ON merchant_alerts(created_at);
   `);
 
+  // Merchant-owned Gmail OAuth app credentials (AES-256-GCM ciphertext). Protect DB + SECRETS_KEY.
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS merchant_oauth_app (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      gmail_client_id_enc TEXT,
+      gmail_client_id_last4 TEXT,
+      gmail_client_secret_enc TEXT,
+      gmail_client_secret_last4 TEXT,
+      redirect_uris_json TEXT,
+      javascript_origins_json TEXT,
+      updated_at TEXT NOT NULL
+    );
+  `);
+
   ensureColumn(database, "merchant_alerts", "dismissed", "INTEGER NOT NULL DEFAULT 0");
 
   database.exec(`

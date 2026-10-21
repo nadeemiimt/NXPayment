@@ -34,10 +34,11 @@ npm run dev:up
 ### Web (Gmail / mock)
 
 1. Open http://127.0.0.1:4321/merchant/auto-confirm  
-2. Turn **Enable auto-confirm** On  
-3. Connect **mock** (or gmail when `GMAIL_CLIENT_ID` / `GMAIL_CLIENT_SECRET` are set)  
-4. Paste a bank credit email sample → **Ingest & poll**  
-5. Or create a unique-amount checkout, then ingest an email for that amount
+2. Under **Gmail OAuth app credentials**, paste Client ID + Secret (or upload Google Web client JSON). Values are masked after save; Reveal/Copy available. Stored encrypted in SQLite (`SECRETS_KEY` / `ADMIN_TOKEN`); env `GMAIL_CLIENT_*` remains fallback.  
+3. Turn **Enable auto-confirm** On  
+4. Connect **mock** (or gmail when OAuth app credentials are configured)  
+5. Paste a bank credit email sample → **Ingest & poll**  
+6. Or create a unique-amount checkout, then ingest an email for that amount
 
 ### Android (SMS / notifications)
 
@@ -72,8 +73,10 @@ Changes for NXPayment: number paise (not bigint), single Fastify API (not separa
 ## Env (optional live Gmail)
 
 ```
+# Prefer Merchant Auto-confirm UI (SQLite, AES-256-GCM). Env is fallback only.
 GMAIL_CLIENT_ID=
 GMAIL_CLIENT_SECRET=
+SECRETS_KEY=
 GMAIL_REDIRECT_URI=http://127.0.0.1:3847/api/oauth/google/callback
 EMAIL_POLL_MS=30000
 YAHOO_CLIENT_ID=

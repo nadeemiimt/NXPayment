@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { GmailOAuthCredentialsPanel } from "@/components/gmail-oauth-credentials";
 
 type EmailStatus = {
   autoConfirmEnabled: boolean;
@@ -136,8 +137,11 @@ export default function AutoConfirmPage() {
           />
           <p className="text-xs text-[var(--nx-muted)]">{status.primaryVerification}</p>
           <p className="text-xs text-[var(--nx-muted)]">
-            Gmail OAuth app env: {status.gmailOAuthConfigured ? "configured" : "not set (mock/ingest OK)"} ·
-            Yahoo OAuth: {status.yahooOAuthConfigured ? "configured" : "not set"}
+            Gmail OAuth app:{" "}
+            {status.gmailOAuthConfigured
+              ? "configured (DB or env)"
+              : "not set (mock/ingest OK)"}{" "}
+            · Yahoo OAuth: {status.yahooOAuthConfigured ? "configured" : "not set"}
           </p>
           {status.emailConnected && (
             <p className="text-sm">
@@ -147,12 +151,13 @@ export default function AutoConfirmPage() {
         </div>
       )}
 
+      <GmailOAuthCredentialsPanel />
+
       <section className="space-y-3">
         <h2 className="font-display text-xl font-semibold">Connect mailbox</h2>
         <p className="text-sm text-[var(--nx-muted)]">
-          Gmail is the primary email path. Live Gmail API polling needs{" "}
-          <code className="text-xs">GMAIL_CLIENT_ID</code> /{" "}
-          <code className="text-xs">GMAIL_CLIENT_SECRET</code>. Until then use{" "}
+          Gmail is the primary email path. Live Gmail API polling needs OAuth app credentials
+          above (or <code className="text-xs">GMAIL_CLIENT_*</code> env). Until then use{" "}
           <strong>mock</strong> + paste a bank alert sample below.
         </p>
         <div className="flex flex-wrap gap-2">

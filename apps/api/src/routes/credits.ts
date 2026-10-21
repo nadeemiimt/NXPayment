@@ -128,7 +128,7 @@ export async function creditRoutes(app: FastifyInstance) {
       config: configDto,
       note:
         parsed.data.provider === "gmail" && !gmailOAuthConfigured()
-          ? "GMAIL_CLIENT_ID/SECRET not set — live Gmail poll returns empty until OAuth is configured. Use mock ingest or paste samples for now."
+          ? "Gmail OAuth Client ID/Secret not configured (Merchant Auto-confirm or GMAIL_CLIENT_* env) — live Gmail poll returns empty. Use mock ingest or paste samples for now."
           : undefined,
     };
   });
