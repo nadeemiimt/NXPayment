@@ -5,9 +5,11 @@ import { config } from "./config.js";
 import { getDb } from "./db/schema.js";
 import { creditRoutes } from "./routes/credits.js";
 import { merchantRoutes } from "./routes/merchant.js";
+import { oauthRoutes } from "./routes/oauth.js";
 import { otpRoutes } from "./routes/otp.js";
 import { paymentRoutes } from "./routes/payments.js";
 import { tillRoutes } from "./routes/till.js";
+
 
 /** Build the Fastify app without listening (used by server + integration tests). */
 export async function buildApp(opts?: {
@@ -51,6 +53,7 @@ export async function buildApp(opts?: {
   await app.register(paymentRoutes);
   await app.register(merchantRoutes);
   await app.register(creditRoutes);
+  await app.register(oauthRoutes);
   await app.register(otpRoutes);
   await app.register(tillRoutes);
 

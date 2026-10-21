@@ -35,6 +35,11 @@ export const config = {
   emailPollMs: Number(process.env.EMAIL_POLL_MS ?? 30_000),
   gmailClientId: process.env.GMAIL_CLIENT_ID ?? "",
   gmailClientSecret: process.env.GMAIL_CLIENT_SECRET ?? "",
+  /** Google OAuth authorized redirect URI (API port). Override for hosted deploys. */
+  gmailRedirectUri:
+    process.env.GMAIL_REDIRECT_URI ??
+    `http://127.0.0.1:${process.env.API_PORT ?? 3847}/api/oauth/google/callback`,
+
   yahooClientId: process.env.YAHOO_CLIENT_ID ?? "",
   yahooClientSecret: process.env.YAHOO_CLIENT_SECRET ?? "",
   yahooImapHost: process.env.YAHOO_IMAP_HOST ?? "",
