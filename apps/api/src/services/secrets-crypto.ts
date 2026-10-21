@@ -51,8 +51,11 @@ export function decryptSecret(ciphertext: string): string {
 export function last4(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return "";
-  if (trimmed.length <= 4) return trimmed;
-  return trimmed.slice(-4);
+  // Google client IDs end in `.apps.googleusercontent.com` — fingerprint the id body.
+  const body = trimmed.replace(/\.apps\.googleusercontent\.com$/i, "");
+  const base = body.length >= 4 ? body : trimmed;
+  if (base.length <= 4) return base;
+  return base.slice(-4);
 }
 
 /** Stable fingerprint for tests — never a reversible encoding of the secret. */
