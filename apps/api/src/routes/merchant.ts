@@ -9,6 +9,13 @@ import {
   upsertGmailOAuthCredentials,
 } from "../services/gmail-oauth-credentials.js";
 import { getMerchantConfig, updateMerchantConfig } from "../services/merchant.js";
+import {
+  clearMerchantToken,
+  listMerchantTokens,
+  revealMerchantToken,
+  updateMerchantToken,
+} from "../services/merchant-tokens.js";
+import { TOKEN_KEYS } from "../services/merchant-tokens-registry.js";
 import { listWebhookDeliveries } from "../services/webhooks.js";
 
 const vpa = z.string().regex(/^[a-zA-Z0-9.\-_]{2,}@[a-zA-Z]{2,}$/, "Invalid VPA");
@@ -145,6 +152,73 @@ export async function merchantRoutes(app: FastifyInstance) {
 
   app.delete("/api/merchant/gmail-oauth", async () => {
     return { gmailOAuth: clearGmailOAuthCredentials() };
+  });
+
+  /**
+   * Unified tokens inventory — masked by default.
+   * See docs/required-tokens.md.
+   */
+  app.get("/api/merchant/tokens", async () => {
+    return listMerchantTokens();
+  });
+
+  app.get("/api/merchant/tokens/:key/reveal", async (req, reply) => {
+    const { key } = req.params as { key: string };
+    if (!TOKEN_KEYS.includes(key)) {
+      return reply.code(404).send({ error: "unknown_token" });
+    }
+    try {
+      return { token: revealMerchantToken(key) };
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "reveal_failed";
+      return reply.code(400).send({ error: code });
+    }
+  });
+
+  app.put("/api/merchant/tokens/:key", async (req, reply) => {
+    const { key } = req.params as { key: string };
+    if (!TOKEN_KEYS.includes(key)) {
+      return reply.code(404).send({ error: "unknown_token" });
+    }
+    const schema = z.object({
+      value: z.string().min(1).max(4096),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "invalid_body", details: parsed.error.flatten() });
+    }
+    try {
+      const token = updateMerchantToken(key, parsed.data.value);
+      // Never echo plaintext value.
+      return { token };
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "update_failed";
+      if (
+        code === "empty_value" ||
+        code === "invalid_length" ||
+        code === "readonly_token" ||
+        code === "unsupported_persist"
+      ) {
+        return reply.code(400).send({ error: code });
+      }
+      return reply.code(500).send({ error: "update_failed" });
+    }
+  });
+
+  app.delete("/api/merchant/tokens/:key", async (req, reply) => {
+    const { key } = req.params as { key: string };
+    if (!TOKEN_KEYS.includes(key)) {
+      return reply.code(404).send({ error: "unknown_token" });
+    }
+    try {
+      return { token: clearMerchantToken(key) };
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "clear_failed";
+      if (code === "clear_not_allowed" || code === "unknown_token") {
+        return reply.code(400).send({ error: code });
+      }
+      return reply.code(500).send({ error: "clear_failed" });
+    }
   });
 
   app.get("/api/rails", async () => {

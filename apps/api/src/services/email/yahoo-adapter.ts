@@ -1,4 +1,5 @@
 import { config } from "../../config.js";
+import { resolveRuntimeSecret } from "../merchant-tokens.js";
 import type { EmailCreditMessage, MailboxAdapter } from "./types.js";
 
 /**
@@ -14,7 +15,9 @@ export class YahooMailboxAdapter implements MailboxAdapter {
   ) {}
 
   async fetchRecentCredits(): Promise<EmailCreditMessage[]> {
-    if (!config.yahooImapHost) {
+    const host =
+      resolveRuntimeSecret("YAHOO_IMAP_HOST") || config.yahooImapHost || "";
+    if (!host) {
       void this.emailAddress;
       void this.appPassword;
       return [];
@@ -25,5 +28,11 @@ export class YahooMailboxAdapter implements MailboxAdapter {
 }
 
 export function yahooOAuthConfigured(): boolean {
-  return Boolean(config.yahooClientId && config.yahooClientSecret);
+  const id =
+    resolveRuntimeSecret("YAHOO_CLIENT_ID") || config.yahooClientId || "";
+  const secret =
+    resolveRuntimeSecret("YAHOO_CLIENT_SECRET") ||
+    config.yahooClientSecret ||
+    "";
+  return Boolean(id && secret);
 }

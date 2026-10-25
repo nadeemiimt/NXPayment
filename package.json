@@ -9,6 +9,7 @@
   "workspaces": [
     "apps/api",
     "apps/web",
+    "apps/desktop",
     "packages/shared"
   ],
   "scripts": {
@@ -22,6 +23,11 @@
     "start:api": "npm run start --workspace=@nxpayment/api",
     "typecheck:api": "npm run typecheck --workspace=@nxpayment/api",
     "test:integration": "npm run test:integration --workspace=@nxpayment/api",
-    "test:gmail-oauth": "npm run test:gmail-oauth --workspace=@nxpayment/api"
+    "test:gmail-oauth": "npm run test:gmail-oauth --workspace=@nxpayment/api",
+    "test:tokens": "npm run test:tokens --workspace=@nxpayment/api",
+    "desktop": "npm run start --workspace=@nxpayment/desktop",
+    "desktop:pack:mac": "npm run pack:mac --workspace=@nxpayment/desktop",
+    "desktop:pack:win": "npm run pack:win --workspace=@nxpayment/desktop",
+    "merchant:launch": "bash scripts/merchant-launch.sh"
   }
 }

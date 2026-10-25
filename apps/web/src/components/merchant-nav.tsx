@@ -11,6 +11,7 @@ const links = [
   { href: "/merchant/payments", label: "Payments" },
   { href: "/merchant/tally", label: "Tally" },
   { href: "/merchant/onboarding", label: "Setup" },
+  { href: "/merchant/tokens", label: "Tokens" },
   { href: "/merchant/auto-confirm", label: "Auto-confirm" },
   { href: "/merchant/alerts", label: "Alerts" },
 ];

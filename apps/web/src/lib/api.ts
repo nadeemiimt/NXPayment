@@ -369,6 +369,44 @@ export const api = {
     request<{ gmailOAuth: Record<string, unknown> }>("/api/merchant/gmail-oauth", {
       method: "DELETE",
     }),
+  getTokens: () =>
+    request<{
+      tokens: MerchantTokenItem[];
+      runReady: boolean;
+      missingRequired: string[];
+      missingRecommended: string[];
+      encryption: { mode: string; keySource: string; note: string };
+    }>("/api/merchant/tokens"),
+  revealToken: (key: string) =>
+    request<{
+      token: { key: string; value: string | null; source: "db" | "env" | "none" };
+    }>(`/api/merchant/tokens/${encodeURIComponent(key)}/reveal`),
+  updateToken: (key: string, value: string) =>
+    request<{ token: MerchantTokenItem }>(
+      `/api/merchant/tokens/${encodeURIComponent(key)}`,
+      { method: "PUT", body: JSON.stringify({ value }) }
+    ),
+  clearToken: (key: string) =>
+    request<{ token: MerchantTokenItem }>(
+      `/api/merchant/tokens/${encodeURIComponent(key)}`,
+      { method: "DELETE" }
+    ),
+};
+
+export type MerchantTokenItem = {
+  key: string;
+  label: string;
+  description: string;
+  requirement: "required" | "recommended" | "optional";
+  kind: "secret" | "config" | "bootstrap";
+  group: string;
+  sensitive: boolean;
+  configured: boolean;
+  source: "db" | "env" | "none";
+  last4: string | null;
+  maskedPreview: string | null;
+  persist: string;
+  updatedAt: string | null;
 };
 
 export { SERVER_API_URL as API_URL };
