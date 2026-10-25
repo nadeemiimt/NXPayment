@@ -57,6 +57,9 @@ export default function MerchantHome() {
         <Button asChild size="lg" variant="outline">
           <Link href="/merchant/onboarding">VPA & branding</Link>
         </Button>
+        <Button asChild size="lg" variant="outline">
+          <Link href="/merchant/tokens">Tokens & secrets</Link>
+        </Button>
         <Button asChild size="lg" variant="ghost">
           <Link href="/checkout">Open test checkout</Link>
         </Button>

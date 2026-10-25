@@ -7,6 +7,7 @@ import { createHash, randomInt } from "node:crypto";
 import { nanoid } from "nanoid";
 import { config } from "../config.js";
 import { getDb } from "../db/schema.js";
+import { resolveRuntimeSecret } from "./merchant-tokens.js";
 
 export type OtpPurpose = "checkout_gate" | "onboarding_gate";
 
@@ -45,15 +46,32 @@ function normalizeE164(phone: string): string {
   return digits;
 }
 
+function whatsappCreds() {
+  const token =
+    resolveRuntimeSecret("WHATSAPP_TOKEN") || config.whatsappToken || "";
+  const phoneId =
+    resolveRuntimeSecret("WHATSAPP_PHONE_ID") || config.whatsappPhoneId || "";
+  const templateName =
+    resolveRuntimeSecret("WHATSAPP_TEMPLATE_NAME") ||
+    config.whatsappTemplateName ||
+    "nxpayment_otp";
+  const templateLang =
+    resolveRuntimeSecret("WHATSAPP_TEMPLATE_LANG") ||
+    config.whatsappTemplateLang ||
+    "en";
+  return { token, phoneId, templateName, templateLang };
+}
+
 export function whatsappOtpStatus(): OtpStatus {
-  const tokenSet = Boolean(config.whatsappToken);
-  const phoneNumberIdSet = Boolean(config.whatsappPhoneId);
+  const { token, phoneId, templateName, templateLang } = whatsappCreds();
+  const tokenSet = Boolean(token);
+  const phoneNumberIdSet = Boolean(phoneId);
   const configured = tokenSet && phoneNumberIdSet;
   return {
     configured,
     mode: configured ? "meta_cloud" : "stub",
-    templateName: config.whatsappTemplateName,
-    templateLang: config.whatsappTemplateLang,
+    templateName,
+    templateLang,
     phoneNumberIdSet,
     tokenSet,
   };
@@ -63,15 +81,16 @@ async function sendMetaCloudTemplate(input: {
   toE164: string;
   code: string;
 }): Promise<{ ok: boolean; messageId?: string; detail: string }> {
+  const { token, phoneId, templateName, templateLang } = whatsappCreds();
   const to = input.toE164.replace(/^\+/, "");
-  const url = `https://graph.facebook.com/v21.0/${config.whatsappPhoneId}/messages`;
+  const url = `https://graph.facebook.com/v21.0/${phoneId}/messages`;
   const body = {
     messaging_product: "whatsapp",
     to,
     type: "template",
     template: {
-      name: config.whatsappTemplateName,
-      language: { code: config.whatsappTemplateLang },
+      name: templateName,
+      language: { code: templateLang },
       components: [
         {
           type: "body",
@@ -91,7 +110,7 @@ async function sendMetaCloudTemplate(input: {
     const res = await fetch(url, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${config.whatsappToken}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),

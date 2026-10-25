@@ -146,6 +146,16 @@ function migrate(database: Db) {
     );
   `);
 
+  // Generic encrypted KV for Yahoo / WhatsApp / other merchant secrets.
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS merchant_secrets (
+      key TEXT PRIMARY KEY,
+      value_enc TEXT NOT NULL,
+      last4 TEXT,
+      updated_at TEXT NOT NULL
+    );
+  `);
+
   ensureColumn(database, "merchant_alerts", "dismissed", "INTEGER NOT NULL DEFAULT 0");
 
   database.exec(`

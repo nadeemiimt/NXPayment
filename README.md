@@ -8,6 +8,7 @@ Direct-to-merchant **UPI checkout software** — buyers pay the merchant’s own
 | --- | --- |
 | `apps/api` | Fastify + SQLite payment API |
 | `apps/web` | Next.js SimpleCheckout + merchant admin |
+| `apps/desktop` | Electron launcher (Mac/Windows packages) |
 | `apps/mobile` | Flutter merchant confirm + tally |
 | `packages/shared` | Shared money / UPI helpers |
 | `deploy/` | Docker Compose + Dockerfiles + `.env.example` |
@@ -77,6 +78,19 @@ See **[docs/local-real-money-testing.md](docs/local-real-money-testing.md)** —
 ### Auto-confirm (Bank SMS & Gmail — not aggregator webhooks)
 
 See **[docs/auto-confirm.md](docs/auto-confirm.md)** and **[docs/youpi-parity.md](docs/youpi-parity.md)**.
+
+### Tokens & merchant desktop
+
+- Inventory: **[docs/required-tokens.md](docs/required-tokens.md)**
+- Merchant UI: `/merchant/tokens` (masked · reveal · copy · update)
+- Mac/Windows packages: **[docs/desktop-packages.md](docs/desktop-packages.md)**
+
+```bash
+npm run merchant:launch          # CLI: API+Web → Tokens UI
+npm run desktop                  # Electron launcher (dev)
+npm run desktop:pack:mac         # .dmg / .zip (build on Mac)
+npm run desktop:pack:win         # prefer Windows host / CI for .exe
+```
 
 ```bash
 npm run dev:up

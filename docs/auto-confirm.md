@@ -34,7 +34,7 @@ npm run dev:up
 ### Web (Gmail / mock)
 
 1. Open http://127.0.0.1:4321/merchant/auto-confirm  
-2. Under **Gmail OAuth app credentials**, paste Client ID + Secret (or upload Google Web client JSON). Values are masked after save; Reveal/Copy available. Stored encrypted in SQLite (`SECRETS_KEY` / `ADMIN_TOKEN`); env `GMAIL_CLIENT_*` remains fallback.  
+2. Under **Gmail OAuth app credentials**, paste Client ID + Secret (or upload Google Web client JSON). Values are masked after save; Reveal/Copy available. Stored encrypted in SQLite (`SECRETS_KEY` / `ADMIN_TOKEN`); env `GMAIL_CLIENT_*` remains fallback. All install secrets also live under **Setup → Tokens** (`/merchant/tokens`) — see [`required-tokens.md`](./required-tokens.md).  
 3. Turn **Enable auto-confirm** On  
 4. Connect **mock** (or gmail when OAuth app credentials are configured)  
 5. Paste a bank credit email sample → **Ingest & poll**  

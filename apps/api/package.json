@@ -12,7 +12,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:integration": "node ./scripts/require-node20.mjs && node --import tsx --test test/integration/payments.integration.test.ts",
-    "test:gmail-oauth": "node ./scripts/require-node20.mjs && node --import tsx --test test/integration/gmail-oauth-secrets.integration.test.ts"
+    "test:gmail-oauth": "node ./scripts/require-node20.mjs && node --import tsx --test test/integration/gmail-oauth-secrets.integration.test.ts",
+    "test:tokens": "node ./scripts/require-node20.mjs && node --import tsx --test test/integration/merchant-tokens.integration.test.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.0.1",

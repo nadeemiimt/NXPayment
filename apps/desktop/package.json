@@ -1,0 +1,72 @@
+{
+  "name": "@nxpayment/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "NXPayment merchant desktop launcher (API + Web)",
+  "main": "main.cjs",
+  "author": "NXPayment",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "pack:mac": "electron-builder --mac dir zip dmg --publish never",
+    "pack:win": "electron-builder --win portable nsis --publish never",
+    "pack:win:dir": "electron-builder --win dir --publish never"
+  },
+  "build": {
+    "appId": "com.nxpayment.merchant",
+    "productName": "NXPayment",
+    "copyright": "Copyright NXPayment",
+    "electronVersion": "33.4.11",
+    "npmRebuild": false,
+    "nodeGypRebuild": false,
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "first-run.html",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../../deploy/.env.example",
+        "to": "env.example"
+      },
+      {
+        "from": "../../docs/required-tokens.md",
+        "to": "required-tokens.md"
+      },
+      {
+        "from": "../../docs/desktop-packages.md",
+        "to": "desktop-packages.md"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.business",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "identity": null
+    },
+    "win": {
+      "target": [
+        "portable",
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "devDependencies": {
+    "electron": "33.4.11",
+    "electron-builder": "25.1.8"
+  },
+  "dependencies": {
+    "app-builder-bin": "^5.0.0-alpha.10"
+  }
+}
