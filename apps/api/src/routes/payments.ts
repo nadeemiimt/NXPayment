@@ -22,6 +22,9 @@ import {
   unreadAlertCount,
 } from "../services/risk.js";
 import { sideEffectBreaker } from "../services/webhooks.js";
+import { sendWhatsAppPayInvite } from "../services/whatsapp-pay.js";
+import { listWhatsAppOutbound } from "../services/whatsapp-audit.js";
+import { buildUpiProviderLinks } from "../../../../packages/shared/src/index.ts";
 
 const createSchema = z.object({
   amountPaise: z.number().int().positive(),
@@ -30,6 +33,10 @@ const createSchema = z.object({
   idempotencyKey: z.string().min(8).max(128).optional(),
   confirmDuplicate: z.boolean().optional(),
   overrideFifo: z.boolean().optional(),
+});
+
+const whatsappInviteSchema = z.object({
+  phoneE164: z.string().min(10).max(20),
 });
 
 export async function paymentRoutes(app: FastifyInstance) {
@@ -112,7 +119,39 @@ export async function paymentRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const payment = getPayment(id);
     if (!payment) return reply.code(404).send({ error: "not_found" });
-    return { payment };
+    return {
+      payment,
+      upiProviders: buildUpiProviderLinks(payment.upiUri),
+    };
+  });
+
+  app.post("/api/payments/:id/whatsapp-invite", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const parsed = whatsappInviteSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "invalid_body", details: parsed.error.flatten() });
+    }
+    try {
+      const result = await sendWhatsAppPayInvite({
+        paymentId: id,
+        phoneE164: parsed.data.phoneE164,
+      });
+      if (!result.ok) {
+        return reply.code(502).send({ error: "whatsapp_send_failed", ...result });
+      }
+      return reply.code(201).send(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const code = message === "Payment not found" ? 404 : 400;
+      return reply.code(code).send({ error: "whatsapp_invite_failed", message });
+    }
+  });
+
+  app.get("/api/whatsapp/outbound", async (req) => {
+    const q = req.query as { limit?: string };
+    return {
+      messages: listWhatsAppOutbound(q.limit ? Number(q.limit) : 20),
+    };
   });
 
   app.post("/api/payments/:id/confirm", async (req, reply) => {

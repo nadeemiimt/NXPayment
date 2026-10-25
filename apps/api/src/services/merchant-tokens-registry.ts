@@ -210,7 +210,8 @@ export const TOKEN_DEFS: TokenDef[] = [
   {
     key: "WHATSAPP_TOKEN",
     label: "WhatsApp (Meta) token",
-    description: "Meta Cloud API permanent/system user token. Unset → OTP dry-run stub.",
+    description:
+      "Meta Cloud API token for OTP gate + payment invites (amount/UPI/QR). Unset → dry-run stub.",
     requirement: "optional",
     kind: "secret",
     persist: "merchant_secrets",

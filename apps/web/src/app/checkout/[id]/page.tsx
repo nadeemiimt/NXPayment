@@ -6,6 +6,7 @@ import { QRCodeSVG } from "qrcode.react";
 import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
+import { UpiAppLaunchers } from "@/components/upi-app-launchers";
 import { api, type MerchantConfig, type Payment, type PaymentStatus } from "@/lib/api";
 import { formatInr } from "@/lib/utils";
 
@@ -16,7 +17,7 @@ function statusCopy(status: PaymentStatus): { title: string; body: string } {
     case "ACTIVE":
       return {
         title: "Waiting for merchant confirmation",
-        body: "Pay with any UPI app, then hang tight — the merchant will confirm this amount.",
+        body: "Pay with PhonePe, Google Pay, Paytm, or any UPI app — then hang tight.",
       };
     case "PROCESSING":
       return {
@@ -85,7 +86,7 @@ export default function CheckoutStatusPage() {
     return (
       <main className="min-h-screen">
         <SiteHeader tone="minimal" />
-        <p className="px-5 text-[#9B2C2C]">{error}</p>
+        <p className="px-5 text-[var(--nx-danger)]">{error}</p>
       </main>
     );
   }
@@ -108,48 +109,40 @@ export default function CheckoutStatusPage() {
     <main className="min-h-screen">
       <SiteHeader tone="minimal" />
       <div className="mx-auto max-w-lg px-5 pb-20">
-        <p className="text-sm uppercase tracking-[0.2em] text-[var(--nx-accent)]">
-          {hideChrome ? brand : `${brand} checkout`}
+        <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-[var(--nx-accent-dark)]">
+          {hideChrome ? brand : "NXPayment · SimpleCheckout"}
         </p>
-        <h1 className="font-display mt-2 text-4xl font-semibold">{formatInr(payment.amountPaise)}</h1>
+        <h1 className="font-display mt-2 text-4xl font-semibold tracking-tight">
+          {formatInr(payment.amountPaise)}
+        </h1>
         <p className="mt-1 text-[var(--nx-muted)]">
-          to {payment.receivingName} · {payment.receivingVpa}
+          to {payment.receivingName} ·{" "}
+          <span className="font-mono text-sm">{payment.receivingVpa}</span>
         </p>
 
-        <div className="nx-rise mt-8 rounded-2xl border border-[var(--nx-line)] bg-white/70 p-6 backdrop-blur-sm">
-          <h2 className="font-display text-2xl">{copy.title}</h2>
+        <div className="nx-rise mt-8 border-t border-[var(--nx-line)] pt-6">
+          <h2 className="font-display text-2xl font-semibold">{copy.title}</h2>
           <p className="mt-2 text-sm text-[var(--nx-muted)]">{copy.body}</p>
 
           {waiting && (
             <>
-              <div className="mt-6 flex justify-center rounded-xl bg-[var(--nx-mist)] p-6">
+              <div className="nx-qr-fade mt-6 flex justify-center bg-[var(--nx-mist)]/80 p-6">
                 <QRCodeSVG value={payment.upiUri} size={200} level="M" includeMargin />
               </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Button asChild className="flex-1">
-                  <a href={payment.upiUri}>Open UPI app</a>
-                </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => navigator.clipboard.writeText(payment.upiUri)}
-                >
-                  Copy UPI link
-                </Button>
-              </div>
+              <UpiAppLaunchers upiUri={payment.upiUri} />
               <div className="mt-6 flex items-center gap-3 text-sm text-[var(--nx-muted)]">
                 <span className="nx-wait-dot inline-block h-2.5 w-2.5 rounded-full bg-[var(--nx-accent)]" />
                 Waiting for merchant to confirm this amount
               </div>
-              <p className="mt-2 text-xs text-[var(--nx-muted)]">
+              <p className="mt-2 font-mono text-xs text-[var(--nx-muted)]">
                 Session expires in {Math.ceil(remainingMs / 1000)}s
               </p>
             </>
           )}
 
           {payment.status === "SUCCESS" && (
-            <div className="mt-6 rounded-xl bg-[var(--nx-mist)] px-4 py-5 text-center">
-              <p className="font-display text-3xl text-[var(--nx-accent)]">Success</p>
+            <div className="mt-6 bg-[var(--nx-mist)] px-4 py-5 text-center">
+              <p className="font-display text-3xl text-[var(--nx-accent-dark)]">Success</p>
               <p className="mt-1 text-sm text-[var(--nx-muted)]">
                 Confirmed {payment.confirmedAt ? new Date(payment.confirmedAt).toLocaleString() : ""}
               </p>
@@ -163,7 +156,7 @@ export default function CheckoutStatusPage() {
           )}
         </div>
 
-        <p className="mt-6 text-center text-xs text-[var(--nx-muted)]">
+        <p className="mt-6 text-center font-mono text-[10px] text-[var(--nx-muted)]">
           Status: {payment.status} · id {payment.id}
         </p>
       </div>

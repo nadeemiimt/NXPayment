@@ -7,7 +7,13 @@ import { createHash, randomInt } from "node:crypto";
 import { nanoid } from "nanoid";
 import { config } from "../config.js";
 import { getDb } from "../db/schema.js";
-import { resolveRuntimeSecret } from "./merchant-tokens.js";
+import {
+  metaGraphJson,
+  normalizeE164,
+  whatsappConfigured,
+  whatsappCreds,
+} from "./whatsapp-meta.js";
+import { recordWhatsAppOutbound } from "./whatsapp-audit.js";
 
 export type OtpPurpose = "checkout_gate" | "onboarding_gate";
 
@@ -35,33 +41,6 @@ function hashCode(code: string): string {
   return createHash("sha256").update(code).digest("hex");
 }
 
-function normalizeE164(phone: string): string {
-  const digits = phone.replace(/[^\d+]/g, "");
-  if (!digits.startsWith("+")) {
-    throw new Error("Phone must be E.164 (e.g. +919876543210)");
-  }
-  if (digits.length < 10 || digits.length > 16) {
-    throw new Error("Invalid E.164 phone length");
-  }
-  return digits;
-}
-
-function whatsappCreds() {
-  const token =
-    resolveRuntimeSecret("WHATSAPP_TOKEN") || config.whatsappToken || "";
-  const phoneId =
-    resolveRuntimeSecret("WHATSAPP_PHONE_ID") || config.whatsappPhoneId || "";
-  const templateName =
-    resolveRuntimeSecret("WHATSAPP_TEMPLATE_NAME") ||
-    config.whatsappTemplateName ||
-    "nxpayment_otp";
-  const templateLang =
-    resolveRuntimeSecret("WHATSAPP_TEMPLATE_LANG") ||
-    config.whatsappTemplateLang ||
-    "en";
-  return { token, phoneId, templateName, templateLang };
-}
-
 export function whatsappOtpStatus(): OtpStatus {
   const { token, phoneId, templateName, templateLang } = whatsappCreds();
   const tokenSet = Boolean(token);
@@ -81,9 +60,8 @@ async function sendMetaCloudTemplate(input: {
   toE164: string;
   code: string;
 }): Promise<{ ok: boolean; messageId?: string; detail: string }> {
-  const { token, phoneId, templateName, templateLang } = whatsappCreds();
+  const { phoneId, templateName, templateLang } = whatsappCreds();
   const to = input.toE164.replace(/^\+/, "");
-  const url = `https://graph.facebook.com/v21.0/${phoneId}/messages`;
   const body = {
     messaging_product: "whatsapp",
     to,
@@ -107,29 +85,24 @@ async function sendMetaCloudTemplate(input: {
   };
 
   try {
-    const res = await fetch(url, {
+    const res = await metaGraphJson(`${phoneId}/messages`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    const data = (await res.json().catch(() => ({}))) as {
-      messages?: Array<{ id?: string }>;
-      error?: { message?: string };
-    };
     if (!res.ok) {
+      const err = res.data.error as { message?: string } | undefined;
       return {
         ok: false,
         detail:
-          data.error?.message ??
+          err?.message ??
           `Meta Cloud API HTTP ${res.status} — check token, phone id, and template`,
       };
     }
+    const messages = res.data.messages as Array<{ id?: string }> | undefined;
     return {
       ok: true,
-      messageId: data.messages?.[0]?.id,
+      messageId: messages?.[0]?.id,
       detail: "OTP sent via Meta Cloud API template",
     };
   } catch (err) {
@@ -144,9 +117,10 @@ async function sendMetaCloudTemplate(input: {
 export async function sendWhatsAppOtp(input: {
   toE164: string;
   code: string;
-}): Promise<Omit<OtpSendResult, "challengeId" | "expiresAt" | "stubCode"> & { stubCode?: string }> {
-  const status = whatsappOtpStatus();
-  if (!status.configured) {
+}): Promise<
+  Omit<OtpSendResult, "challengeId" | "expiresAt" | "stubCode"> & { stubCode?: string }
+> {
+  if (!whatsappConfigured()) {
     return {
       ok: true,
       mode: "stub",
@@ -182,6 +156,14 @@ export async function createAndSendOtpChallenge(input: {
     .run(id, phone, hashCode(code), input.purpose, expiresAt, new Date(now).toISOString());
 
   const sent = await sendWhatsAppOtp({ toE164: phone, code });
+  recordWhatsAppOutbound({
+    kind: "otp",
+    toPhoneE164: phone,
+    mode: sent.mode,
+    ok: sent.ok,
+    messageId: sent.messageId ?? null,
+    detail: sent.detail,
+  });
   if (!sent.ok) {
     return {
       ok: false,

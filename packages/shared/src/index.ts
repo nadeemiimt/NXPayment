@@ -120,3 +120,11 @@ export interface GstExportAdapter {
 export interface ReconciliationAdapter {
   importStatement(raw: unknown): Promise<{ stub: true; message: string }>;
 }
+
+export {
+  buildUpiProviderLinks,
+  parseUpiPayQuery,
+  resolveUpiLaunchHref,
+  type UpiProviderId,
+  type UpiProviderLink,
+} from "./upi-providers";
