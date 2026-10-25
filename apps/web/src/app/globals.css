@@ -3,48 +3,108 @@
 @tailwind utilities;
 
 :root {
-  --nx-ink: #14201b;
-  --nx-paper: #f3efe6;
-  --nx-mist: #e5eee8;
-  --nx-muted: #5c6b63;
-  --nx-line: #c8d5cc;
-  --nx-accent: #0b6e4f;
-  --nx-accent-dark: #08553c;
-  --nx-sand: #d8c3a5;
+  /* Fintech: deep teal/ink + electric accent (avoid purple / cream-serif / broadsheet) */
+  --nx-ink: #071820;
+  --nx-deep: #0a2430;
+  --nx-paper: #f2f7f8;
+  --nx-mist: #e0ecef;
+  --nx-muted: #5a7380;
+  --nx-line: #c2d4da;
+  --nx-accent: #00c9b1;
+  --nx-accent-dark: #00a894;
+  --nx-glow: #1ae8cf;
+  --nx-danger: #c23b3b;
   --background: var(--nx-paper);
   --foreground: var(--nx-ink);
-  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-sans: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
 }
 
 body {
   font-family: var(--font-sans);
   color: var(--nx-ink);
-  background:
-    radial-gradient(1200px 600px at 10% -10%, rgba(11, 110, 79, 0.18), transparent 55%),
-    radial-gradient(900px 500px at 100% 0%, rgba(216, 195, 165, 0.45), transparent 50%),
-    linear-gradient(180deg, #ebe6db 0%, var(--nx-paper) 40%, #e7efe9 100%);
+  background-color: var(--nx-paper);
+  background-image:
+    radial-gradient(900px 480px at 8% -8%, rgba(0, 201, 177, 0.16), transparent 55%),
+    radial-gradient(700px 420px at 100% 0%, rgba(10, 36, 48, 0.1), transparent 50%),
+    linear-gradient(180deg, #eef5f6 0%, var(--nx-paper) 42%, #e8f1f3 100%);
   min-height: 100vh;
 }
 
-.nx-grain {
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+.nx-grid-bg {
+  background-image:
+    linear-gradient(rgba(7, 24, 32, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(7, 24, 32, 0.035) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 20%, #000 35%, transparent 80%);
 }
 
 @keyframes nx-pulse {
-  0%, 100% { opacity: 0.45; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.04); }
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(0, 201, 177, 0.35);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+    box-shadow: 0 0 0 6px rgba(0, 201, 177, 0);
+  }
 }
 
 @keyframes nx-rise {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes nx-qr-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .nx-rise {
-  animation: nx-rise 0.6s ease-out both;
+  animation: nx-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.nx-qr-fade {
+  animation: nx-qr-in 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .nx-wait-dot {
-  animation: nx-pulse 1.4s ease-in-out infinite;
+  animation: nx-pulse 1.5s ease-in-out infinite;
+}
+
+.nx-cta {
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.nx-cta:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px -10px rgba(0, 201, 177, 0.55);
+}
+
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
 }

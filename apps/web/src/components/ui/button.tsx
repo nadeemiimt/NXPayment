@@ -4,16 +4,16 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--nx-accent)] disabled:pointer-events-none disabled:opacity-50",
+  "nx-cta inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--nx-accent)] disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
-        default: "bg-[var(--nx-accent)] text-white hover:bg-[var(--nx-accent-dark)]",
-        secondary: "bg-[var(--nx-ink)] text-[var(--nx-paper)] hover:opacity-90",
+        default: "bg-[var(--nx-accent)] text-[var(--nx-ink)] hover:bg-[var(--nx-accent-dark)] hover:text-white",
+        secondary: "bg-[var(--nx-deep)] text-[var(--nx-paper)] hover:opacity-90",
         outline:
-          "border border-[var(--nx-line)] bg-transparent hover:bg-[var(--nx-mist)]",
+          "border border-[var(--nx-line)] bg-transparent hover:border-[var(--nx-accent)] hover:bg-[var(--nx-mist)]",
         ghost: "hover:bg-[var(--nx-mist)]",
-        danger: "bg-[#9B2C2C] text-white hover:bg-[#742A2A]",
+        danger: "bg-[var(--nx-danger)] text-white hover:bg-[#9e2f2f]",
       },
       size: {
         default: "h-11 px-5 py-2",

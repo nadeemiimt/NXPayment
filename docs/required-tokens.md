@@ -27,9 +27,9 @@ Prefer the merchant **Tokens** UI (`/merchant/tokens`) for values that can live 
 | `YAHOO_CLIENT_ID` | Optional | Encrypted DB `merchant_secrets` + env | Yahoo OAuth (planned / partial) |
 | `YAHOO_CLIENT_SECRET` | Optional | Encrypted DB + env | Pair with Yahoo client id |
 | `YAHOO_IMAP_HOST` | Optional | Encrypted DB + env | IMAP host when using app password |
-| `WHATSAPP_TOKEN` | Optional | Encrypted DB + env | Meta Cloud API; unset → OTP dry-run stub |
+| `WHATSAPP_TOKEN` | Optional | Encrypted DB + env | Meta Cloud API for OTP + pay invites; unset → dry-run stub |
 | `WHATSAPP_PHONE_ID` | Optional | Encrypted DB + env | Meta phone number id |
-| `WHATSAPP_TEMPLATE_NAME` | Optional | Encrypted DB + env | Default `nxpayment_otp` |
+| `WHATSAPP_TEMPLATE_NAME` | Optional | Encrypted DB + env | OTP template only (default `nxpayment_otp`) |
 | `WHATSAPP_TEMPLATE_LANG` | Optional | Encrypted DB + env | Default `en` |
 | `API_PORT` / `WEB_PORT` / `DB_PATH` / `CORS_ORIGIN` / `NEXT_PUBLIC_API_URL` | Ops | Env only | Runtime wiring — not merchant “secrets” |
 
@@ -64,6 +64,7 @@ Dev defaults exist for `ADMIN_TOKEN` / `WEBHOOK_SECRET` / a placeholder VPA so `
 | Gmail auto-confirm | `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, mailbox refresh token (`EMAIL_MAILBOX_SECRET` via Connect), `SECRETS_KEY` |
 | Yahoo mailbox | `YAHOO_CLIENT_ID` / `YAHOO_CLIENT_SECRET` and/or `YAHOO_IMAP_HOST` + mailbox secret |
 | WhatsApp OTP gate | `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID` (+ template name/lang) |
+| WhatsApp pay invite (Confirm UI → buyer) | Same `WHATSAPP_TOKEN` + `WHATSAPP_PHONE_ID`; unset returns stub payload with QR PNG for local QA |
 | Branding | `BRAND_NAME`, `ACCENT_COLOR`, `LOGO_URL`, `hideNxChrome` (Setup) |
 
 ---

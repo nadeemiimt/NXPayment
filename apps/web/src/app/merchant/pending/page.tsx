@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, type Payment } from "@/lib/api";
 import { formatInr } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { WhatsAppPayInvite } from "@/components/whatsapp-pay-invite";
 
 export default function PendingPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -37,30 +38,30 @@ export default function PendingPage() {
 
   return (
     <div>
-      <h1 className="font-display text-3xl font-semibold">Pending confirms</h1>
+      <h1 className="font-display text-3xl font-semibold tracking-tight">Pending confirms</h1>
       <p className="mt-2 text-[var(--nx-muted)]">
         Buyer already paid (or will pay) to your VPA. Confirm only when you see the credit —
-        or trust your till.
+        or trust your till. Send a WhatsApp invite with amount + QR when the buyer is remote.
       </p>
-      {error && <p className="mt-3 text-sm text-[#9B2C2C]">{error}</p>}
+      {error && <p className="mt-3 text-sm text-[var(--nx-danger)]">{error}</p>}
 
-      <div className="mt-8 space-y-4">
+      <div className="mt-8 space-y-6">
         {payments.length === 0 && (
-          <p className="rounded-xl border border-dashed border-[var(--nx-line)] px-4 py-10 text-center text-[var(--nx-muted)]">
+          <p className="border border-dashed border-[var(--nx-line)] px-4 py-10 text-center text-[var(--nx-muted)]">
             No payments waiting. Open checkout to create a test payment.
           </p>
         )}
         {payments.map((p) => (
           <article
             key={p.id}
-            className="rounded-2xl border border-[var(--nx-line)] bg-white/70 p-5 sm:p-6"
+            className="border border-[var(--nx-line)] bg-white/50 p-5 sm:p-6"
           >
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-xs uppercase tracking-wider text-[var(--nx-muted)]">
+                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--nx-muted)]">
                   Confirm this amount
                 </p>
-                <p className="font-display mt-1 text-4xl font-semibold sm:text-5xl">
+                <p className="font-display mt-1 text-4xl font-semibold tracking-tight sm:text-5xl">
                   {formatInr(p.amountPaise)}
                 </p>
                 <p className="mt-2 text-sm text-[var(--nx-muted)]">
@@ -86,6 +87,7 @@ export default function PendingPage() {
                 </Button>
               </div>
             </div>
+            <WhatsAppPayInvite paymentId={p.id} amountPaise={p.amountPaise} />
           </article>
         ))}
       </div>

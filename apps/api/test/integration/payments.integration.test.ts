@@ -436,6 +436,73 @@ describe("NXPayment API integration", () => {
     assert.equal((confirmed.body.payment as Json).status, "SUCCESS");
   });
 
+  test("UPI provider deep links on payment GET", async () => {
+    const created = await json(requireApp(), "POST", "/api/payments", {
+      amountPaise: 50100,
+      note: "upi-providers",
+      overrideFifo: true,
+      confirmDuplicate: true,
+    });
+    assert.equal(created.status, 201);
+    const id = (created.body.payment as Json).id as string;
+    const upiUri = (created.body.payment as Json).upiUri as string;
+    assert.ok(upiUri.startsWith("upi://pay?"));
+    assert.ok(upiUri.includes("pa="));
+
+    const got = await json(requireApp(), "GET", `/api/payments/${id}`);
+    assert.equal(got.status, 200);
+    const providers = got.body.upiProviders as Json[];
+    assert.ok(Array.isArray(providers));
+    const byId = Object.fromEntries(providers.map((p) => [p.id, p]));
+    assert.ok(String(byId.phonepe.deepLink).startsWith("phonepe://pay?"));
+    assert.ok(String(byId.gpay.deepLink).startsWith("gpay://upi/pay?"));
+    assert.ok(String(byId.paytm.deepLink).startsWith("paytmmp://pay?"));
+    assert.ok(String(byId.generic.deepLink).startsWith("upi://pay?"));
+    assert.ok(String(byId.phonepe.androidIntent).includes("package=com.phonepe.app"));
+    assert.ok(
+      String(byId.gpay.androidIntent).includes(
+        "package=com.google.android.apps.nbu.paisa.user"
+      )
+    );
+    assert.ok(String(byId.paytm.androidIntent).includes("package=net.one97.paytm"));
+    await json(requireApp(), "POST", `/api/payments/${id}/reject`, {});
+  });
+
+  test("WhatsApp payment invite stub returns QR payload", async () => {
+    const created = await json(requireApp(), "POST", "/api/payments", {
+      amountPaise: 77700,
+      note: "wa-invite",
+      overrideFifo: true,
+      confirmDuplicate: true,
+    });
+    assert.equal(created.status, 201);
+    const id = (created.body.payment as Json).id as string;
+
+    const invite = await json(requireApp(), "POST", `/api/payments/${id}/whatsapp-invite`, {
+      phoneE164: "+919811122233",
+    });
+    assert.equal(invite.status, 201);
+    assert.equal(invite.body.mode, "stub");
+    assert.equal(invite.body.ok, true);
+    assert.ok(typeof invite.body.auditId === "string");
+    const stub = invite.body.stubPayload as Json;
+    assert.ok(stub);
+    assert.equal(stub.to, "+919811122233");
+    assert.ok(String(stub.text).includes("NXPayment"));
+    assert.ok(String(stub.upiUri).startsWith("upi://pay?"));
+    assert.ok(typeof stub.qrPngBase64 === "string");
+    assert.ok(String(stub.qrPngBase64).length > 80);
+    // PNG magic in base64 typically starts with iVBOR
+    assert.ok(String(stub.qrPngBase64).startsWith("iVBOR"));
+
+    const audit = await json(requireApp(), "GET", "/api/whatsapp/outbound?limit=5");
+    assert.equal(audit.status, 200);
+    const messages = audit.body.messages as Json[];
+    assert.ok(messages.some((m) => m.kind === "payment_invite" && m.mode === "stub"));
+
+    await json(requireApp(), "POST", `/api/payments/${id}/reject`, {});
+  });
+
   test("WhatsApp OTP stub send + verify (dry-run)", async () => {
     const status = await json(requireApp(), "GET", "/api/otp/whatsapp/status");
     assert.equal(status.status, 200);

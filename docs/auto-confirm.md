@@ -104,6 +104,22 @@ Without Gmail OAuth, use **mock ingest** for end-to-end matching.
 
 ---
 
+## WhatsApp pay invite (merchant → buyer)
+
+On **Merchant → Confirm**, each pending payment has **WhatsApp pay invite**: enter the buyer’s
+E.164 number and send amount + merchant name + `upi://` link + QR PNG.
+
+| Env | Role |
+| --- | --- |
+| `WHATSAPP_TOKEN` | Meta Cloud token (same as OTP) |
+| `WHATSAPP_PHONE_ID` | Meta phone number id |
+
+- **Configured:** uploads QR media, sends image message with caption (amount / UPI URI).
+- **Unset:** dry-run stub — API returns `stubPayload` (text + `qrPngBase64`); UI shows it.
+- Audit: `whatsapp_outbound_audit` (masked phone, mode, ok, message id) — no secrets.
+
+API: `POST /api/payments/:id/whatsapp-invite` `{ "phoneE164": "+91…" }`
+
 ## WhatsApp OTP gate (Phase C)
 
 Optional buyer/merchant gate — **not** a payment verifier. Verification SoT remains SMS/Gmail parse + manual Confirm.

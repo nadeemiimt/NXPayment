@@ -309,6 +309,25 @@ export const api = {
       "/api/otp/whatsapp/verify",
       { method: "POST", body: JSON.stringify(body) }
     ),
+  sendWhatsAppPayInvite: (paymentId: string, body: { phoneE164: string }) =>
+    request<WhatsAppPayInviteResult>(
+      `/api/payments/${encodeURIComponent(paymentId)}/whatsapp-invite`,
+      { method: "POST", body: JSON.stringify(body) }
+    ),
+  listWhatsAppOutbound: (limit = 20) =>
+    request<{
+      messages: Array<{
+        id: string;
+        kind: string;
+        paymentId: string | null;
+        toPhoneMasked: string;
+        mode: string;
+        ok: boolean;
+        messageId: string | null;
+        detail: string;
+        createdAt: string;
+      }>;
+    }>(`/api/whatsapp/outbound?limit=${limit}`),
   createTillSale: (body: {
     amountPaise: number;
     method: "cash" | "card_counter";
@@ -391,6 +410,22 @@ export const api = {
       `/api/merchant/tokens/${encodeURIComponent(key)}`,
       { method: "DELETE" }
     ),
+};
+
+export type WhatsAppPayInviteResult = {
+  ok: boolean;
+  mode: "stub" | "meta_cloud";
+  auditId: string;
+  messageId?: string;
+  detail: string;
+  stubPayload?: {
+    to: string;
+    text: string;
+    upiUri: string;
+    amountInr: string;
+    merchantName: string;
+    qrPngBase64: string;
+  };
 };
 
 export type MerchantTokenItem = {

@@ -91,22 +91,18 @@ export default function CheckoutStartPage() {
     <main className="min-h-screen">
       <SiteHeader />
       <div className="mx-auto max-w-lg px-5 pb-16 pt-4">
-        {!hideChrome && (
-          <p className="text-sm uppercase tracking-[0.2em] text-[var(--nx-accent)]">
-            SimpleCheckout
-          </p>
-        )}
-        <h1 className="font-display mt-2 text-4xl font-semibold text-[var(--nx-ink)]">
+        <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-[var(--nx-accent-dark)]">
+          {hideChrome ? brand : "NXPayment · SimpleCheckout"}
+        </p>
+        <h1 className="font-display mt-2 text-4xl font-semibold tracking-tight text-[var(--nx-ink)]">
           Pay {config?.displayName ?? "merchant"}
         </h1>
         <p className="mt-2 text-[var(--nx-muted)]">
           Funds go directly to{" "}
-          <span className="font-medium text-[var(--nx-ink)]">
+          <span className="font-mono text-sm font-medium text-[var(--nx-ink)]">
             {config?.primaryVpa ?? "merchant VPA"}
           </span>
-          {hideChrome
-            ? "."
-            : ". NXPayment never holds the money."}
+          {hideChrome ? "." : ". NXPayment never holds the money."}
         </p>
 
         {config?.whatsappOtpEnabled && !otpOk ? (
@@ -123,7 +119,7 @@ export default function CheckoutStartPage() {
             />
           </div>
         ) : (
-          <div className="mt-8 space-y-4">
+          <div className="mt-8 space-y-4 border-t border-[var(--nx-line)] pt-6">
             <label className="block text-sm font-medium">
               Amount (₹)
               <Input
@@ -151,7 +147,7 @@ export default function CheckoutStartPage() {
                 placeholder="Table 4"
               />
             </label>
-            {error && <p className="text-sm text-[#9B2C2C]">{error}</p>}
+            {error && <p className="text-sm text-[var(--nx-danger)]">{error}</p>}
             <Button className="w-full" size="lg" disabled={loading} onClick={() => create(false)}>
               {loading ? "Creating…" : "Continue to UPI"}
             </Button>
@@ -169,7 +165,7 @@ export default function CheckoutStartPage() {
             </DialogDescription>
           </DialogHeader>
           {existing[0] && (
-            <p className="mb-4 rounded-md bg-[var(--nx-mist)] px-3 py-2 text-sm">
+            <p className="mb-4 bg-[var(--nx-mist)] px-3 py-2 font-mono text-sm">
               Existing: {existing[0].id.slice(0, 8)}… · {existing[0].status}
             </p>
           )}

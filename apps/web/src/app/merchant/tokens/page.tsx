@@ -22,7 +22,7 @@ const GROUP_LABEL: Record<string, string> = {
   webhooks: "Webhooks",
   gmail: "Gmail auto-confirm",
   yahoo: "Yahoo mailbox",
-  whatsapp: "WhatsApp OTP",
+  whatsapp: "WhatsApp (OTP + pay invite)",
   branding: "Branding",
   ops: "Ops",
 };
@@ -225,7 +225,22 @@ export default function MerchantTokensPage() {
         <Link href="/merchant/auto-confirm" className="text-[var(--nx-accent)] underline-offset-2 hover:underline">
           Auto-confirm mailbox
         </Link>
+        {" · "}
+        <Link href="/merchant/pending" className="text-[var(--nx-accent)] underline-offset-2 hover:underline">
+          Confirm (WhatsApp pay invite)
+        </Link>
       </p>
+
+      <div className="mt-6 max-w-2xl border border-[var(--nx-line)] bg-[var(--nx-mist)]/50 px-4 py-3 text-sm text-[var(--nx-muted)]">
+        <p className="font-medium text-[var(--nx-ink)]">WhatsApp pay invites</p>
+        <p className="mt-1">
+          Set <code className="font-mono text-xs">WHATSAPP_TOKEN</code> +{" "}
+          <code className="font-mono text-xs">WHATSAPP_PHONE_ID</code> for live Meta Cloud
+          (OTP templates + payment QR image messages). When unset, Confirm → WhatsApp pay invite
+          returns a dry-run stub with text + QR PNG for local testing. Outbound audit stores
+          masked phone only — never tokens.
+        </p>
+      </div>
 
       {message && (
         <p className="mt-4 rounded-md border border-[var(--nx-line)] bg-white/70 px-3 py-2 text-sm">

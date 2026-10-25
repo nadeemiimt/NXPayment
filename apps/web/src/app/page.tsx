@@ -10,15 +10,15 @@ export default function HomePage() {
         className="pointer-events-none absolute inset-0 -z-10"
         style={{
           background:
-            "linear-gradient(135deg, rgba(11,110,79,0.22) 0%, transparent 42%), linear-gradient(to top, rgba(20,32,27,0.08), transparent 35%)",
+            "radial-gradient(ellipse 70% 50% at 70% 10%, rgba(0,201,177,0.2), transparent 55%), linear-gradient(to top, rgba(7,24,32,0.06), transparent 40%)",
         }}
       />
       <SiteHeader />
       <section className="mx-auto flex min-h-[78vh] w-full max-w-5xl flex-col justify-center px-5 pb-16 pt-6">
-        <p className="nx-rise mb-4 text-sm font-medium uppercase tracking-[0.22em] text-[var(--nx-accent)]">
+        <p className="nx-rise mb-3 font-mono text-xs font-medium uppercase tracking-[0.28em] text-[var(--nx-accent-dark)]">
           Payment software · not a PSP
         </p>
-        <h1 className="nx-rise font-display max-w-3xl text-5xl font-semibold leading-[1.05] tracking-tight text-[var(--nx-ink)] sm:text-6xl md:text-7xl">
+        <h1 className="nx-rise font-display max-w-3xl text-5xl font-semibold leading-[1.02] tracking-tight text-[var(--nx-ink)] sm:text-6xl md:text-7xl">
           NXPayment
         </h1>
         <p

@@ -29,7 +29,7 @@ export function MerchantNav() {
             className={cn(
               "rounded-md px-3 py-2 text-sm whitespace-nowrap",
               active
-                ? "bg-[var(--nx-ink)] text-[var(--nx-paper)]"
+                ? "bg-[var(--nx-deep)] text-[var(--nx-paper)]"
                 : "text-[var(--nx-muted)] hover:bg-[var(--nx-mist)] hover:text-[var(--nx-ink)]"
             )}
           >

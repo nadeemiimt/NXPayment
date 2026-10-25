@@ -14,23 +14,24 @@ export function SiteHeader({ tone = "default" }: { tone?: "default" | "minimal" 
       .catch(() => setConfig(null));
   }, []);
 
-  const brand = config?.brandName?.trim() || "NXPayment";
+  const merchantBrand = config?.brandName?.trim() || "";
   const hideChrome = Boolean(config?.hideNxChrome);
-  const showNxTag = !hideChrome && tone === "default";
+  const showNx = !hideChrome;
+  const title = hideChrome && merchantBrand ? merchantBrand : "NXPayment";
 
   return (
     <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-5 py-5">
       <Link href="/" className="group flex items-baseline gap-2">
         <span className="font-display text-2xl font-semibold tracking-tight text-[var(--nx-ink)]">
-          {brand}
+          {title}
         </span>
-        {showNxTag && brand !== "NXPayment" && (
-          <span className="text-xs uppercase tracking-[0.18em] text-[var(--nx-muted)] group-hover:text-[var(--nx-accent)]">
-            powered quietly
+        {showNx && merchantBrand && merchantBrand !== "NXPayment" && (
+          <span className="text-xs uppercase tracking-[0.18em] text-[var(--nx-muted)] group-hover:text-[var(--nx-accent-dark)]">
+            {merchantBrand}
           </span>
         )}
-        {showNxTag && brand === "NXPayment" && (
-          <span className="text-xs uppercase tracking-[0.18em] text-[var(--nx-muted)] group-hover:text-[var(--nx-accent)]">
+        {showNx && (!merchantBrand || merchantBrand === "NXPayment") && (
+          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--nx-accent-dark)]">
             direct UPI
           </span>
         )}

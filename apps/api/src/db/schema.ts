@@ -172,6 +172,21 @@ function migrate(database: Db) {
     CREATE INDEX IF NOT EXISTS idx_otp_phone ON whatsapp_otp_challenges(phone_e164);
   `);
 
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS whatsapp_outbound_audit (
+      id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL,
+      payment_id TEXT,
+      to_phone_masked TEXT NOT NULL,
+      mode TEXT NOT NULL,
+      ok INTEGER NOT NULL DEFAULT 0,
+      message_id TEXT,
+      detail TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_wa_out_created ON whatsapp_outbound_audit(created_at);
+  `);
+
   const row = database.prepare("SELECT id FROM merchant_config WHERE id = 1").get();
   if (!row) {
     const now = new Date().toISOString();
