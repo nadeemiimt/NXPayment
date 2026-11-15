@@ -12,6 +12,7 @@ const links = [
   { href: "/merchant/reports", label: "Reports" },
   { href: "/merchant/insights", label: "Insights" },
   { href: "/merchant/inventory", label: "Inventory" },
+  { href: "/merchant/loyalty", label: "Loyalty" },
   { href: "/merchant/shops", label: "Shops" },
   { href: "/merchant/storage", label: "Storage" },
   { href: "/merchant/receipts", label: "Receipts" },

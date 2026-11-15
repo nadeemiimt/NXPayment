@@ -143,8 +143,30 @@ export function buildReceipt(paymentId: string): ReceiptDto | null {
   const printedAt = new Date().toISOString();
   const paymentAt = row.confirmed_at ?? row.created_at;
 
+  const saleRows = getDb()
+    .prepare(
+      `SELECT label, amount_paise, sale_mode, qty, weight_unit, rate_paise
+       FROM sale_lines WHERE payment_id = ? ORDER BY created_at ASC`
+    )
+    .all(paymentId) as Array<{
+    label: string;
+    amount_paise: number;
+    sale_mode: string;
+    qty: number;
+    weight_unit: string | null;
+    rate_paise: number;
+  }>;
+
   const lines: ReceiptLineItem[] = [];
-  if (row.note) {
+  if (saleRows.length > 0) {
+    for (const s of saleRows) {
+      const meta =
+        s.sale_mode === "weight" && s.weight_unit
+          ? `${s.qty} ${s.weight_unit} × Rs ${(s.rate_paise / 100).toFixed(2)}/${s.weight_unit}`
+          : undefined;
+      lines.push({ label: s.label, amountPaise: s.amount_paise, meta });
+    }
+  } else if (row.note) {
     lines.push({ label: row.note, amountPaise: row.amount_paise });
   } else {
     lines.push({ label: "Sale / UPI payment", amountPaise: row.amount_paise });
@@ -180,6 +202,7 @@ export function buildReceipt(paymentId: string): ReceiptDto | null {
   textLines.push(separator(width));
 
   for (const item of lines) {
+    if (item.meta) textLines.push(item.meta.slice(0, width));
     if (item.amountPaise != null) {
       textLines.push(moneyLine(item.label.slice(0, 16), item.amountPaise, width));
     } else {

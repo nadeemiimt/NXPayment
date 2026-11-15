@@ -1,8 +1,8 @@
 # NXPayment — Local shop / restaurant SaaS plan
 
-**Audience:** kirana, cafés, restaurants, small retail — one install per merchant (or per outlet), money still settles **direct to merchant UPI/VPA** (no licensed PA in the primary path).
+**Audience:** kirana, cafés, restaurants, **pharmacies**, **retail chains**, and **malls / multi-outlet** — packaged per merchant or per org, money still settles **direct to merchant UPI/VPA** (no licensed PA in the primary path).
 
-**Status:** Plan approved for execution. Slice 1 starts immediately; later slices stay queued until Slice 1 lands.
+**Status:** Slice 1 in review (#8). **Slice 2 in progress** — mall/retail scale + sell-by-weight + secondary storage.
 
 ---
 
@@ -112,6 +112,15 @@
 - **Merchant setting:** paper width 58/80mm, custom header/footer text.
 - Does not change direct-to-merchant UPI settlement.
 
+### Loyalty (Slice 2 add-on)
+
+- Identify / enroll customers by phone (optional name); track purchase amount, frequency, recency.
+- Configurable rules per shop/org: points per ₹ spent, tier thresholds (bronze/silver/gold), or stamp-style visit rewards.
+- Insights: nudge high spenders going quiet, frequent buyers — reuse pattern heuristics.
+- At sale/checkout: look up customer, show points/tier, apply reward (discount paise or redeem points) when configured.
+- Merchant UI: `/merchant/loyalty` — customers, tiers, rules, encourage actions (manual note / WhatsApp stub).
+- Loyalty is merchant-side CRM only — UPI settlement stays direct-to-merchant.
+
 ## Architecture (delta on current stack)
 
 ```
@@ -144,11 +153,33 @@ Keep Fastify + Next.js + Flutter path; Flutter later mirrors reports + display p
 6. README + merchant docs for storage + display hardware.
 7. PR against `main` on `nadeemiimt/NXPayment`.
 
-### Slice 2 — replication & online primary
+### Slice 2 — mall / retail scale + loose weight + secondary storage
 
-- Real secondary sync (WAL ship or Postgres replica).
-- Online Postgres as primary option with connection string in Tokens/Storage (encrypted).
-- Conflict policy documented.
+**Sell by weight (loose items)**
+- Item `sale_mode`: `unit` | `weight` (loose).
+- Weight units: kg, g, L, ml (configurable); weigh at sale → amount = weight × price_per_unit.
+- Bulk cost + retail price_per_kg (or per g) with same profit math as unit items.
+- POS/checkout: enter weight (manual or scale stub); receipt shows weight + rate.
+- Inventory qty tracked in base unit (e.g. grams).
+
+**Malls / multi-outlet retail**
+- Org → many shops (mall floors, pharmacy branches, retail counters).
+- Shop types: retail, restaurant, pharmacy, mall_kiosk, supermarket.
+- Active shop switcher; reports/insights filter by shop or org roll-up.
+- Optional per-shop VPA; staff role stub (owner / cashier) for mall cashiers.
+- Higher-volume-friendly list pagination and quick-sale from inventory.
+
+**Loyalty (purchase-pattern rewards)**
+- Enroll customers (phone ± name); track spend, frequency, recency.
+- Configurable rules: points per ₹, tiers, visit stamps; earn on confirm, redeem at sale.
+- Pattern nudges: high spenders going quiet, frequent buyers — encourage more visits.
+- UI `/merchant/loyalty`; checkout lookup shows tier/points; WhatsApp nudge stub optional.
+- Merchant-side CRM only — does not change direct UPI settlement.
+
+**Storage (from original Slice 2)**
+- Real secondary SQLite backup job (periodic copy / WAL-aware).
+- Online Postgres primary: config + driver stub or thin real path if feasible; encrypted DSN.
+- Conflict / failover notes in README.
 
 ### Slice 3 — display hardware + multi-device
 
@@ -181,3 +212,11 @@ Keep Fastify + Next.js + Flutter path; Flutter later mirrors reports + display p
 - Reports show daily/monthly/FY totals with GST and at least two charts.
 - Insights show actionable focus / avoid recommendations without requiring an LLM key.
 - No secrets committed; integration tests cover GST math + report aggregates + display session happy path.
+
+
+## Success criteria (Slice 2)
+
+- Loose/weight items sell with rate × weight, stock deducted in base units, receipts show weight + rate.
+- Shop types include mall_kiosk and supermarket; reports can roll up all shops or one; cashier role stub cannot edit storage secrets.
+- Inventory lists paginate; quick-sale from inventory creates a UPI payment.
+- `local_replica` runs a real periodic secondary SQLite backup; online Postgres has encrypted DSN + status (thin path or documented stub) and conflict policy in README.

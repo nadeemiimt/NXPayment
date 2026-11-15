@@ -60,6 +60,33 @@ docker compose -f deploy/docker-compose.yml up --build
 - API: port `3847`  
 - Web: port `4321`
 
+## Local shop SaaS (Slice 2 — malls / weight / loyalty)
+
+Stacked on Slice 1. Targets malls, pharmacies, and retail chains plus loose weight sales.
+
+### Sell by weight
+
+- Inventory `sale_mode`: `unit` | `weight` with units kg/g/L/ml (stock in base g/ml).
+- Quick-sale: enter weight → amount = weight × rate; stock deducted; receipt shows weight + rate.
+- Profit math uses bulk cost in the same display unit as the shelf rate.
+
+### Malls / multi-outlet
+
+- Shop types: `retail`, `restaurant`, `pharmacy`, `mall_kiosk`, `supermarket`.
+- Reports: **Active shop** or **All shops (org)** roll-up.
+- Staff role stub: `owner` | `cashier` (cashier sells/confirms; cannot edit storage secrets / manage shops).
+- Inventory pagination + search; **Quick sale** → UPI payment.
+
+### Secondary storage
+
+- `local_replica` / hybrid: real periodic WAL-aware SQLite file backup to secondary path.
+- Online Postgres: encrypted DSN + status (`configured_sqlite_primary`); SQLite remains write primary. Conflict policy documented in Storage UI/API.
+
+### Loyalty
+
+- `/merchant/loyalty` — enroll by phone, points per ₹, tiers, stamp visits, nudge suggestions (WhatsApp stub).
+- At quick-sale optionally attach `customerId` + `pointsToRedeem`.
+
 ## Local shop SaaS (Slice 1)
 
 Plan pillars: storage modes, counter display, GST reports, insights, multi-shop inventory (retail / restaurant / pharmacy), bulk vs retail profit math. Direct-to-merchant UPI is unchanged.

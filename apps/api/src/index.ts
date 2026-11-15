@@ -4,6 +4,7 @@ import sensible from "@fastify/sensible";
 import { config } from "./config.js";
 import { getDb } from "./db/schema.js";
 import { displayRoutes } from "./routes/display.js";
+import { loyaltyRoutes } from "./routes/loyalty.js";
 import { merchantRoutes } from "./routes/merchant.js";
 import { paymentRoutes } from "./routes/payments.js";
 import { receiptRoutes } from "./routes/receipts.js";
@@ -11,7 +12,7 @@ import { reportRoutes } from "./routes/reports.js";
 import { shopRoutes } from "./routes/shops.js";
 import { storageRoutes } from "./routes/storage.js";
 import { expireDuePayments } from "./services/payments.js";
-import { getStorageSettings, runSecondaryBackup } from "./services/storage.js";
+import { runSecondaryBackup, shouldRunPeriodicBackup } from "./services/storage.js";
 
 const app = Fastify({
   logger: true,
@@ -31,6 +32,7 @@ await app.register(shopRoutes);
 await app.register(displayRoutes);
 await app.register(reportRoutes);
 await app.register(receiptRoutes);
+await app.register(loyaltyRoutes);
 
 const expireTimer = setInterval(() => {
   try {
@@ -44,17 +46,10 @@ expireTimer.unref();
 
 const backupTimer = setInterval(() => {
   try {
-    const settings = getStorageSettings();
-    if (
-      settings.secondaryPath &&
-      (settings.mode === "local_replica" ||
-        settings.mode === "hybrid" ||
-        settings.mode === "online_primary")
-    ) {
-      const result = runSecondaryBackup();
-      if (!result.ok) app.log.warn({ err: result.error }, "secondary backup failed");
-      else app.log.info({ dest: result.copiedTo }, "secondary backup ok");
-    }
+    if (!shouldRunPeriodicBackup()) return;
+    const result = runSecondaryBackup();
+    if (!result.ok) app.log.warn({ err: result.error }, "secondary backup failed");
+    else app.log.info({ dest: result.copiedTo, bytes: result.bytes }, "secondary backup ok");
   } catch (err) {
     app.log.error(err, "backup job failed");
   }

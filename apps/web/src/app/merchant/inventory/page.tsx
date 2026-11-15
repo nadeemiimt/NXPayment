@@ -1,13 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   api,
   type InventoryItem,
   type Location,
   type PricingBreakdown,
   type ProjectedProfit,
+  type SaleMode,
   type Shop,
+  type WeightUnit,
 } from "@/lib/api";
 import { formatInr } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -20,15 +23,24 @@ function paiseFromRupees(raw: string): number {
 }
 
 export default function InventoryPage() {
+  const router = useRouter();
   const [shop, setShop] = useState<Shop | null>(null);
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [search, setSearch] = useState("");
   const [locations, setLocations] = useState<Location[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<InventoryItem | null>(null);
+  const [weightSaleId, setWeightSaleId] = useState<string | null>(null);
+  const [weightInput, setWeightInput] = useState("0.25");
 
   const [name, setName] = useState("");
   const [sku, setSku] = useState("");
   const [qty, setQty] = useState("0");
+  const [saleMode, setSaleMode] = useState<SaleMode>("unit");
+  const [weightUnit, setWeightUnit] = useState<WeightUnit>("kg");
   const [bulkQty, setBulkQty] = useState("1000");
   const [bulkCostInr, setBulkCostInr] = useState("3500");
   const [unitPriceInr, setUnitPriceInr] = useState("4");
@@ -50,12 +62,14 @@ export default function InventoryPage() {
     setShop(active);
     if (!active) return;
     const [inv, loc] = await Promise.all([
-      api.listInventory(active.id),
+      api.listInventory({ shopId: active.id, page, pageSize: 25, q: search || undefined }),
       api.listLocations(active.id),
     ]);
     setItems(inv.items);
+    setTotalPages(inv.totalPages);
+    setTotal(inv.total);
     setLocations(loc.locations);
-  }, []);
+  }, [page, search]);
 
   useEffect(() => {
     load().catch((e) => setError(e.message));
@@ -70,8 +84,9 @@ export default function InventoryPage() {
       bulkCostPaise: paiseFromRupees(bulkCostInr),
       unitPricePaise: paiseFromRupees(unitPriceInr),
       sellQty: Number(sellN) || 0,
+      saleMode,
     }),
-    [bulkQty, bulkCostInr, unitPriceInr, sellN]
+    [bulkQty, bulkCostInr, unitPriceInr, sellN, saleMode]
   );
 
   useEffect(() => {
@@ -93,10 +108,12 @@ export default function InventoryPage() {
     setName("");
     setSku("");
     setQty("0");
+    setSaleMode("unit");
+    setWeightUnit("kg");
     setBulkQty("1000");
     setBulkCostInr("3500");
     setUnitPriceInr("4");
-    setSellN("100");
+    setSellN(saleMode === "weight" ? "1" : "100");
     setLocationId("");
     setPackSize("");
     setBatchNo("");
@@ -107,24 +124,43 @@ export default function InventoryPage() {
     setEditing(item);
     setName(item.name);
     setSku(item.sku ?? "");
-    setQty(String(item.qty));
+    setSaleMode(item.saleMode);
+    setWeightUnit(item.weightUnit ?? "kg");
+    setQty(
+      item.saleMode === "weight"
+        ? String(item.qtyDisplay ?? 0)
+        : String(item.qty)
+    );
     setBulkQty(String(item.bulkQty ?? 1));
     setBulkCostInr(String((item.bulkCostPaise ?? 0) / 100));
     setUnitPriceInr(String((item.unitPricePaise ?? 0) / 100));
-    setSellN(String(item.projectedProfit?.sellQty ?? 100));
+    setSellN(String(item.projectedProfit?.sellQty ?? (item.saleMode === "weight" ? 1 : 100)));
     setLocationId(item.locationId ?? "");
     setPackSize(item.packSize ?? "");
     setBatchNo(item.batchNo ?? "");
     setExpiryDate(item.expiryDate ?? "");
   }
 
+  async function doQuickSale(item: InventoryItem) {
+    setError(null);
+    try {
+      if (item.saleMode === "weight") {
+        setWeightSaleId(item.id);
+        return;
+      }
+      const r = await api.quickSale(item.id, { qty: 1, confirmDuplicate: true });
+      router.push(`/merchant/receipts/${r.payment.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Quick sale failed");
+    }
+  }
+
   return (
     <div>
       <h1 className="font-display text-3xl font-semibold">Inventory</h1>
       <p className="mt-2 max-w-2xl text-[var(--nx-muted)]">
-        Quick-add with bulk cost and retail sell price. Profit/unit is derived — e.g. 1000 @ ₹3500
-        cost, sell ₹4 → ₹0.50/unit; sell 100 → ₹50.
-        {isPharmacy ? " Pharmacy fields: batch, expiry, pack size." : ""}
+        Unit or loose weight items. Quick-sale opens a UPI payment and deducts stock.
+        {isPharmacy ? " Pharmacy: batch / expiry / pack size." : ""}
       </p>
       {error && <p className="mt-3 text-sm text-[#9B2C2C]">{error}</p>}
 
@@ -134,11 +170,12 @@ export default function InventoryPage() {
           e.preventDefault();
           setError(null);
           if (!shop) return;
-          const body = {
+          const body: Record<string, unknown> = {
             shopId: shop.id,
             name,
             sku: sku || null,
-            qty: Number(qty) || 0,
+            saleMode,
+            weightUnit: saleMode === "weight" ? weightUnit : null,
             bulkQty: Number(bulkQty),
             bulkCostPaise: paiseFromRupees(bulkCostInr),
             unitPricePaise: paiseFromRupees(unitPriceInr),
@@ -147,6 +184,8 @@ export default function InventoryPage() {
             batchNo: batchNo || null,
             expiryDate: expiryDate || null,
           };
+          if (saleMode === "weight") body.qtyDisplay = Number(qty) || 0;
+          else body.qty = Number(qty) || 0;
           try {
             if (editing) await api.updateInventory(editing.id, body);
             else await api.createInventory(body);
@@ -164,11 +203,36 @@ export default function InventoryPage() {
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
-        <Input placeholder="SKU (optional)" value={sku} onChange={(e) => setSku(e.target.value)} />
+        <select
+          className="h-11 rounded-md border border-[var(--nx-line)] bg-white/80 px-3"
+          value={saleMode}
+          onChange={(e) => {
+            const m = e.target.value as SaleMode;
+            setSaleMode(m);
+            setSellN(m === "weight" ? "1" : "100");
+          }}
+        >
+          <option value="unit">Unit (piece)</option>
+          <option value="weight">Weight / loose</option>
+        </select>
+        {saleMode === "weight" ? (
+          <select
+            className="h-11 rounded-md border border-[var(--nx-line)] bg-white/80 px-3"
+            value={weightUnit}
+            onChange={(e) => setWeightUnit(e.target.value as WeightUnit)}
+          >
+            <option value="kg">kg</option>
+            <option value="g">g</option>
+            <option value="L">L</option>
+            <option value="ml">ml</option>
+          </select>
+        ) : (
+          <Input placeholder="SKU (optional)" value={sku} onChange={(e) => setSku(e.target.value)} />
+        )}
         <Input
           type="number"
           step="any"
-          placeholder="Stock qty"
+          placeholder={saleMode === "weight" ? `Stock (${weightUnit})` : "Stock qty"}
           value={qty}
           onChange={(e) => setQty(e.target.value)}
         />
@@ -176,7 +240,7 @@ export default function InventoryPage() {
           required
           type="number"
           step="any"
-          placeholder="Bulk qty (e.g. 1000)"
+          placeholder={saleMode === "weight" ? `Bulk qty (${weightUnit})` : "Bulk qty"}
           value={bulkQty}
           onChange={(e) => setBulkQty(e.target.value)}
         />
@@ -192,14 +256,14 @@ export default function InventoryPage() {
           required
           type="number"
           step="0.01"
-          placeholder="Sell price / unit ₹"
+          placeholder={saleMode === "weight" ? `Sell ₹ / ${weightUnit}` : "Sell ₹ / unit"}
           value={unitPriceInr}
           onChange={(e) => setUnitPriceInr(e.target.value)}
         />
         <Input
           type="number"
           step="any"
-          placeholder="Profit if sell N"
+          placeholder={saleMode === "weight" ? "Profit if sell N units of weight" : "Profit if sell N"}
           value={sellN}
           onChange={(e) => setSellN(e.target.value)}
         />
@@ -218,37 +282,24 @@ export default function InventoryPage() {
 
         {isPharmacy && (
           <>
-            <Input
-              placeholder="Pack size"
-              value={packSize}
-              onChange={(e) => setPackSize(e.target.value)}
-            />
-            <Input
-              placeholder="Batch no."
-              value={batchNo}
-              onChange={(e) => setBatchNo(e.target.value)}
-            />
-            <Input
-              type="date"
-              placeholder="Expiry"
-              value={expiryDate}
-              onChange={(e) => setExpiryDate(e.target.value)}
-            />
+            <Input placeholder="Pack size" value={packSize} onChange={(e) => setPackSize(e.target.value)} />
+            <Input placeholder="Batch no." value={batchNo} onChange={(e) => setBatchNo(e.target.value)} />
+            <Input type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} />
           </>
         )}
 
         {preview && (
           <div className="sm:col-span-2 rounded-md border border-[var(--nx-line)] bg-white/50 px-4 py-3 text-sm">
             <p>
-              Cost/unit{" "}
+              Cost/{saleMode === "weight" ? weightUnit : "u"}{" "}
               <strong>{formatInr(preview.pricing.costPerUnitPaise)}</strong>
               {" · "}
-              Profit/unit{" "}
+              Profit/{saleMode === "weight" ? weightUnit : "u"}{" "}
               <strong className="text-[var(--nx-accent)]">
                 {formatInr(preview.pricing.profitPerUnitPaise)}
               </strong>
               {" · "}
-              Profit if sell {preview.projectedProfit.sellQty}:{" "}
+              If sell {preview.projectedProfit.sellQty}:{" "}
               <strong>{formatInr(preview.projectedProfit.profitPaise)}</strong>
             </p>
           </div>
@@ -264,16 +315,82 @@ export default function InventoryPage() {
         </div>
       </form>
 
-      <div className="mt-10 overflow-x-auto">
-        <table className="w-full min-w-[720px] text-left text-sm">
+      <div className="mt-8 flex flex-wrap items-center gap-3">
+        <Input
+          className="max-w-xs"
+          placeholder="Search name / SKU"
+          value={search}
+          onChange={(e) => {
+            setPage(1);
+            setSearch(e.target.value);
+          }}
+        />
+        <span className="text-sm text-[var(--nx-muted)]">
+          {total} items · page {page}/{totalPages}
+        </span>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={page <= 1}
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
+        >
+          Prev
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={page >= totalPages}
+          onClick={() => setPage((p) => p + 1)}
+        >
+          Next
+        </Button>
+      </div>
+
+      {weightSaleId && (
+        <form
+          className="mt-4 flex max-w-md flex-wrap items-end gap-2 rounded-md border border-[var(--nx-line)] p-3"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            try {
+              const r = await api.quickSale(weightSaleId, {
+                weightDisplay: Number(weightInput),
+                confirmDuplicate: true,
+              });
+              setWeightSaleId(null);
+              router.push(`/merchant/receipts/${r.payment.id}`);
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "Sale failed");
+            }
+          }}
+        >
+          <label className="text-sm">
+            Weight
+            <Input
+              className="mt-1"
+              type="number"
+              step="any"
+              value={weightInput}
+              onChange={(e) => setWeightInput(e.target.value)}
+              required
+            />
+          </label>
+          <Button type="submit">Sell & UPI</Button>
+          <Button type="button" variant="ghost" onClick={() => setWeightSaleId(null)}>
+            Cancel
+          </Button>
+        </form>
+      )}
+
+      <div className="mt-6 overflow-x-auto">
+        <table className="w-full min-w-[800px] text-left text-sm">
           <thead className="text-xs uppercase tracking-wider text-[var(--nx-muted)]">
             <tr>
               <th className="py-2 pr-3">Item</th>
-              <th className="py-2 pr-3">Qty</th>
-              <th className="py-2 pr-3">Sell</th>
-              <th className="py-2 pr-3">Cost/u</th>
+              <th className="py-2 pr-3">Stock</th>
+              <th className="py-2 pr-3">Rate</th>
               <th className="py-2 pr-3">Profit/u</th>
-              <th className="py-2 pr-3">If sell N</th>
               <th className="py-2"> </th>
             </tr>
           </thead>
@@ -283,27 +400,32 @@ export default function InventoryPage() {
                 <td className="py-3 pr-3">
                   <div className="font-medium">{item.name}</div>
                   <div className="text-xs text-[var(--nx-muted)]">
-                    {[item.sku, item.locationName, item.batchNo, item.expiryDate]
-                      .filter(Boolean)
-                      .join(" · ")}
+                    {item.saleMode === "weight" ? `loose · ${item.weightUnit}` : "unit"}
+                    {item.sku ? ` · ${item.sku}` : ""}
+                    {item.locationName ? ` · ${item.locationName}` : ""}
                   </div>
                 </td>
-                <td className="py-3 pr-3">{item.qty}</td>
                 <td className="py-3 pr-3">
-                  {item.unitPricePaise != null ? formatInr(item.unitPricePaise) : "—"}
+                  {item.saleMode === "weight"
+                    ? `${item.qtyDisplay ?? 0} ${item.weightUnit}`
+                    : item.qty}
                 </td>
                 <td className="py-3 pr-3">
-                  {item.pricing ? formatInr(item.pricing.costPerUnitPaise) : "—"}
+                  {item.unitPricePaise != null
+                    ? `${formatInr(item.unitPricePaise)}${item.saleMode === "weight" ? `/${item.weightUnit}` : ""}`
+                    : "—"}
                 </td>
                 <td className="py-3 pr-3 text-[var(--nx-accent)]">
                   {item.pricing ? formatInr(item.pricing.profitPerUnitPaise) : "—"}
                 </td>
-                <td className="py-3 pr-3">
-                  {item.projectedProfit
-                    ? `${formatInr(item.projectedProfit.profitPaise)} (N=${item.projectedProfit.sellQty})`
-                    : "—"}
-                </td>
                 <td className="py-3 whitespace-nowrap">
+                  <button
+                    type="button"
+                    className="mr-3 text-[var(--nx-accent)] underline"
+                    onClick={() => doQuickSale(item)}
+                  >
+                    Quick sale
+                  </button>
                   <button
                     type="button"
                     className="mr-3 text-[var(--nx-accent)] underline"

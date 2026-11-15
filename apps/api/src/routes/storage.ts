@@ -31,6 +31,8 @@ export async function storageRoutes(app: FastifyInstance) {
         },
         secondary: {
           path: storage.secondaryPath,
+          exists: storage.secondaryExists,
+          sizeBytes: storage.secondarySizeBytes,
           lastBackupAt: storage.lastBackupAt,
           lastBackupError: storage.lastBackupError,
         },
@@ -39,6 +41,8 @@ export async function storageRoutes(app: FastifyInstance) {
           connectionConfigured: storage.onlineConnectionConfigured,
           status: storage.onlinePrimaryStatus,
         },
+        backupIntervalMs: storage.backupIntervalMs,
+        conflictPolicy: storage.conflictPolicy,
         sliceNote: storage.sliceNote,
       },
     };
@@ -49,13 +53,21 @@ export async function storageRoutes(app: FastifyInstance) {
     if (!parsed.success) {
       return reply.code(400).send({ error: "invalid_body", details: parsed.error.flatten() });
     }
-    const storage = updateStorageSettings({
-      mode: parsed.data.mode as StorageMode | undefined,
-      secondaryPath: parsed.data.secondaryPath,
-      onlinePrimaryEnabled: parsed.data.onlinePrimaryEnabled,
-      onlineConnectionString: parsed.data.onlineConnectionString,
-    });
-    return { storage };
+    try {
+      const storage = updateStorageSettings({
+        mode: parsed.data.mode as StorageMode | undefined,
+        secondaryPath: parsed.data.secondaryPath,
+        onlinePrimaryEnabled: parsed.data.onlinePrimaryEnabled,
+        onlineConnectionString: parsed.data.onlineConnectionString,
+      });
+      return { storage };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes("Cashier")) {
+        return reply.code(403).send({ error: "forbidden", message });
+      }
+      return reply.code(400).send({ error: "update_failed", message });
+    }
   });
 
   app.post("/api/merchant/storage/backup", async () => {
