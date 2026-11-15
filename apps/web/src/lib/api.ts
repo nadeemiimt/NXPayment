@@ -49,6 +49,36 @@ export interface MerchantConfig {
   updatedAt: string;
 }
 
+export interface ProviderSettings {
+  upiEnabled: boolean;
+  cardsEnabled: boolean;
+  otherEnabled: boolean;
+  primaryProvider: string;
+  backupProvider: string | null;
+  agentsEnabled: boolean;
+  updatedAt: string;
+  summary: {
+    primaryLabel: string;
+    backupLabel: string | null;
+    cardsComingSoon: boolean;
+  };
+  providers: Array<{
+    id: string;
+    label: string;
+    category: string;
+    configured: boolean;
+  }>;
+}
+
+export interface AgentKeyPublic {
+  id: string;
+  name: string;
+  keyPrefix: string;
+  createdAt: string;
+  revokedAt: string | null;
+  active: boolean;
+}
+
 export interface Tally {
   from: string;
   to: string;
@@ -339,6 +369,45 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(body),
     }),
+  getProviders: () => request<{ providers: ProviderSettings }>("/api/merchant/providers"),
+  updateProviders: (body: {
+    upiEnabled?: boolean;
+    cardsEnabled?: boolean;
+    otherEnabled?: boolean;
+    primaryProvider?: string;
+    backupProvider?: string | null;
+    agentsEnabled?: boolean;
+  }) =>
+    request<{ providers: ProviderSettings }>("/api/merchant/providers", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  getAgents: () =>
+    request<{
+      agentsEnabled: boolean;
+      hasActiveKey: boolean;
+      keys: AgentKeyPublic[];
+    }>("/api/merchant/agents"),
+  createAgentKey: (name?: string) =>
+    request<{
+      key: AgentKeyPublic;
+      apiKey: string;
+      warning: string;
+    }>("/api/merchant/agents/keys", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+  revokeAgentKey: (id: string) =>
+    request<{ key: AgentKeyPublic }>(`/api/merchant/agents/keys/${id}/revoke`, {
+      method: "POST",
+    }),
+  revokeAllAgentKeys: () =>
+    request<{
+      revoked: number;
+      agentsEnabled: boolean;
+      hasActiveKey: boolean;
+      keys: AgentKeyPublic[];
+    }>("/api/merchant/agents/revoke-all", { method: "POST" }),
   createPayment: (body: {
     amountPaise: number;
     merchantOrderId?: string;

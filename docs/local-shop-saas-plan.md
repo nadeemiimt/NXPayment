@@ -2,7 +2,7 @@
 
 **Audience:** kirana, cafés, restaurants, **pharmacies**, **retail chains**, and **malls / multi-outlet** — packaged per merchant or per org, money still settles **direct to merchant UPI/VPA** (no licensed PA in the primary path).
 
-**Status:** Slice 1 in review (#8). **Slice 2 in progress** — mall/retail scale + sell-by-weight + secondary storage.
+**Status:** Slice 1–3 merged. **Slice 4** — simple provider hub + agent commerce (UPI default; agents = one toggle + one key).
 
 ---
 
@@ -181,16 +181,31 @@ Keep Fastify + Next.js + Flutter path; Flutter later mirrors reports + display p
 - Online Postgres primary: config + driver stub or thin real path if feasible; encrypted DSN.
 - Conflict / failover notes in README.
 
-### Slice 3 — display hardware + multi-device
+### Slice 3 — AI + payment differentiators
+
+- Smart confirm assist, margin/loss guard, loyalty next-best offer (merged).
+
+### Slice 4 — next-gen provider hub + agent commerce (keep it simple)
+
+**Spirit:** next-gen under the hood; **simple product** on the surface — kirana/pharmacy takes payment in &lt;3 taps.
+
+1. **Providers (minimal UI):** UPI on by default. Cards = one “Coming soon” stub. At most primary + optional backup (Advanced only). No maze of rails.
+2. **Agent commerce API** — catalog / quote / pay / status + OpenAPI; merchant sees only: “Allow shopping agents” + one API key (copy once). Folded into Setup — no new nav.
+3. **Advanced** collapsed — registry + stubs in code; hide from default nav.
+4. **SimpleCheckout unchanged** as the human path. Direct UPI remains primary; no licensed PA required.
+
+**Product rule:** every new feature ships with a default; configuration is optional.
+
+### Slice 5 — display hardware + multi-device
 
 - Display pairing codes, multi-display, Flutter counter mode.
 - Optional ESP32/webview guide.
 
-### Slice 4 — GSTN / GSTR-ready export + reconciliation
+### Slice 6 — GSTN / GSTR-ready export + reconciliation
 
 - Structured GSTR-1-ish export; reconciliation vs bank credits.
 
-### Slice 5 — richer GenAI + alerts
+### Slice 7 — richer GenAI + alerts
 
 - Scheduled daily insight push (WhatsApp/email); anomaly alerts.
 
@@ -220,3 +235,11 @@ Keep Fastify + Next.js + Flutter path; Flutter later mirrors reports + display p
 - Shop types include mall_kiosk and supermarket; reports can roll up all shops or one; cashier role stub cannot edit storage secrets.
 - Inventory lists paginate; quick-sale from inventory creates a UPI payment.
 - `local_replica` runs a real periodic secondary SQLite backup; online Postgres has encrypted DSN + status (thin path or documented stub) and conflict policy in README.
+
+## Success criteria (Slice 4)
+
+- Provider registry selects `upi_direct` by default; card / Authorize.net stubs return clear “not configured”.
+- Setup shows ≤3 payment toggles (UPI / Cards / Other under Advanced); no new merchant nav items.
+- Agent API: catalog, quote, create, status (+ optional confirm) with Bearer key; OpenAPI at `/api/agent/v1/openapi.json`.
+- Agent keys hashed at rest; plaintext shown once; never committed.
+- Tests cover registry selection + agent create/status happy path.

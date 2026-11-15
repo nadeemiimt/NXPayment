@@ -7,16 +7,49 @@ export interface PaymentSession {
 }
 
 export interface CheckoutPresentation {
-  upiUri: string;
-  qrPayload: string;
+  upiUri: string | null;
+  qrPayload: string | null;
+  deepLinks: Record<string, string>;
   railId: string;
+  provider: string;
+  /** Present when the provider cannot create a live checkout. */
+  notConfigured?: boolean;
+  message?: string;
 }
 
-export type RailHealth = "up" | "degraded" | "down";
+export type RailHealth = "up" | "degraded" | "down" | "not_configured";
 
-export interface PaymentRail {
+export interface ProviderCapabilities {
+  create: boolean;
+  status: boolean;
+  refund: boolean;
+  /** Human-facing category for simple merchant UI. */
+  category: "upi" | "cards" | "other";
+  label: string;
+}
+
+export interface ProviderStatus {
+  status: string;
+  provider: string;
+  raw?: unknown;
+  notConfigured?: boolean;
+  message?: string;
+}
+
+/**
+ * Pluggable payment provider (rail).
+ * UPI direct is the default; card / Authorize.net stubs stay not-configured.
+ */
+export interface PaymentProvider {
   id: string;
-  createCheckout(session: PaymentSession): Promise<CheckoutPresentation>;
-  handleWebhook?(raw: unknown): Promise<{ status: string }>;
+  capabilities: ProviderCapabilities;
+  createPayment(session: PaymentSession): Promise<CheckoutPresentation>;
+  getStatus(paymentId: string): Promise<ProviderStatus>;
+  refund?(paymentId: string, amountPaise?: number): Promise<{ ok: boolean; message: string }>;
   healthCheck(): Promise<RailHealth>;
 }
+
+/** @deprecated Prefer PaymentProvider — kept for older imports. */
+export type PaymentRail = PaymentProvider & {
+  createCheckout(session: PaymentSession): Promise<CheckoutPresentation>;
+};

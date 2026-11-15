@@ -258,6 +258,26 @@ function migrate(database: Db) {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS provider_settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      upi_enabled INTEGER NOT NULL DEFAULT 1,
+      cards_enabled INTEGER NOT NULL DEFAULT 0,
+      other_enabled INTEGER NOT NULL DEFAULT 0,
+      primary_provider TEXT NOT NULL DEFAULT 'upi_direct',
+      backup_provider TEXT,
+      agents_enabled INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS agent_api_keys (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL DEFAULT 'default',
+      key_prefix TEXT NOT NULL,
+      key_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      revoked_at TEXT
+    );
   `);
 
   // Additive columns (migrate-on-boot)
@@ -318,6 +338,11 @@ function migrate(database: Db) {
   }
   if (!hasColumn(database, "payments", "gst_price_mode")) {
     database.exec(`ALTER TABLE payments ADD COLUMN gst_price_mode TEXT`);
+  }
+  if (!hasColumn(database, "payments", "provider_id")) {
+    database.exec(
+      `ALTER TABLE payments ADD COLUMN provider_id TEXT NOT NULL DEFAULT 'upi_direct'`
+    );
   }
 
   database.exec(`CREATE INDEX IF NOT EXISTS idx_payments_shop ON payments(shop_id)`);
@@ -398,6 +423,18 @@ function migrate(database: Db) {
       .run(now);
   }
 
+  const providers = database.prepare("SELECT id FROM provider_settings WHERE id = 1").get();
+  if (!providers) {
+    database
+      .prepare(
+        `INSERT INTO provider_settings (
+          id, upi_enabled, cards_enabled, other_enabled,
+          primary_provider, backup_provider, agents_enabled, updated_at
+        ) VALUES (1, 1, 0, 0, 'upi_direct', NULL, 0, ?)`
+      )
+      .run(now);
+  }
+
   // Ensure at least one default shop for multi-shop UX
   const shopCount = database.prepare("SELECT COUNT(*) as c FROM shops WHERE deleted_at IS NULL").get() as {
     c: number;
@@ -414,7 +451,7 @@ function migrate(database: Db) {
 
   database
     .prepare(
-      `INSERT INTO app_meta (key, value) VALUES ('schema_version', '4')
+      `INSERT INTO app_meta (key, value) VALUES ('schema_version', '5')
        ON CONFLICT(key) DO UPDATE SET value = excluded.value`
     )
     .run();

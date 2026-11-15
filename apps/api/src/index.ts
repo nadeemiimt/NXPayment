@@ -3,6 +3,7 @@ import cors from "@fastify/cors";
 import sensible from "@fastify/sensible";
 import { config } from "./config.js";
 import { getDb } from "./db/schema.js";
+import { agentRoutes } from "./routes/agent.js";
 import { displayRoutes } from "./routes/display.js";
 import { loyaltyRoutes } from "./routes/loyalty.js";
 import { merchantRoutes } from "./routes/merchant.js";
@@ -31,6 +32,7 @@ app.get("/health", async () => ({ ok: true, service: "nxpayment-api" }));
 
 await app.register(paymentRoutes);
 await app.register(merchantRoutes);
+await app.register(agentRoutes);
 await app.register(storageRoutes);
 await app.register(shopRoutes);
 await app.register(displayRoutes);
