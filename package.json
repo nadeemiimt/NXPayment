@@ -11,12 +11,19 @@
   "scripts": {
     "dev:api": "npm run dev --workspace=@nxpayment/api",
     "dev:web": "npm run dev --workspace=@nxpayment/web",
+    "dev:up": "node scripts/dev-up.mjs",
     "start:api": "npm run start --workspace=@nxpayment/api",
     "typecheck:api": "npm run typecheck --workspace=@nxpayment/api",
     "test:api": "npm run test --workspace=@nxpayment/api",
-    "require-node20": "node scripts/require-node20.js"
+    "require-node20": "node scripts/require-node20.js",
+    "test:e2e": "node scripts/require-node20.js && playwright test",
+    "test:e2e:ui": "node scripts/require-node20.js && playwright test --ui",
+    "test:e2e:install": "playwright install chromium"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.1"
   }
 }

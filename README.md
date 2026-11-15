@@ -18,18 +18,40 @@ Product docs (Project store): `docs/project-context.md`, `architecture-plan.md`,
 
 ```bash
 cp deploy/.env.example .env
+npm install
 
-# API — http://127.0.0.1:3847
-cd apps/api && npm install && npm run dev
+# Both API (:3847) + web (:4321)
+npm run dev:up
 
-# Web — http://127.0.0.1:4321  (separate terminal)
-cd apps/web && npm install && npm run dev
+# Or separately:
+npm run dev:api   # http://127.0.0.1:3847
+npm run dev:web   # http://127.0.0.1:4321
 ```
 
 1. Open [http://127.0.0.1:4321/merchant/onboarding](http://127.0.0.1:4321/merchant/onboarding) → set VPA.  
 2. Open [http://127.0.0.1:4321/checkout](http://127.0.0.1:4321/checkout) → create a payment → scan/open UPI.  
 3. Open [http://127.0.0.1:4321/merchant/pending](http://127.0.0.1:4321/merchant/pending) → **Confirm**.  
 4. Buyer page polls to `SUCCESS`; webhook delivery is logged (or POSTed if `WEBHOOK_URL` is set).
+
+### Playwright E2E
+
+Hermetic Chromium tests against temp SQLite (no Gmail / WhatsApp / LLM secrets). Ports: API `3847`, web `4321`.
+
+```bash
+npm install
+npx playwright install chromium   # or: npm run test:e2e:install
+
+# Local (starts API + Next via Playwright webServer; uses next dev when CI unset)
+npm run test:e2e
+
+# CI-like (build + production start)
+npm run build --workspace=@nxpayment/web
+CI=true npm run test:e2e
+```
+
+Coverage: merchant onboarding/home, checkout QR wait, confirm/reject pending, inventory quick-add, reports, loyalty, storage, display kiosk. `/merchant/tokens` is soft-skipped when the route is absent.
+
+GitHub Actions: `.github/workflows/e2e.yml` (Node 20, install, build web, run Playwright, upload report on failure).
 
 ### Same-amount guard
 
