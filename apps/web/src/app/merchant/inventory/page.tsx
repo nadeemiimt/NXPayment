@@ -141,17 +141,33 @@ export default function InventoryPage() {
     setExpiryDate(item.expiryDate ?? "");
   }
 
-  async function doQuickSale(item: InventoryItem) {
+  async function doQuickSale(item: InventoryItem, acceptMarginWarning = false) {
     setError(null);
     try {
       if (item.saleMode === "weight") {
         setWeightSaleId(item.id);
         return;
       }
-      const r = await api.quickSale(item.id, { qty: 1, confirmDuplicate: true });
+      const r = await api.quickSale(item.id, {
+        qty: 1,
+        confirmDuplicate: true,
+        acceptMarginWarning,
+      });
       router.push(`/merchant/receipts/${r.payment.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Quick sale failed");
+      const e = err as Error & {
+        status?: number;
+        body?: { error?: string; message?: string; margin?: { action: string; message: string | null } };
+      };
+      if (e.status === 409 && e.body?.error === "margin_guard" && !acceptMarginWarning) {
+        const ok = window.confirm(
+          `${e.body.margin?.message ?? e.message}\n\nProceed with sale anyway?`
+        );
+        if (ok) return doQuickSale(item, true);
+        setError(e.body.margin?.message ?? e.message);
+        return;
+      }
+      setError(e.message || "Quick sale failed");
     }
   }
 
@@ -353,16 +369,31 @@ export default function InventoryPage() {
           className="mt-4 flex max-w-md flex-wrap items-end gap-2 rounded-md border border-[var(--nx-line)] p-3"
           onSubmit={async (e) => {
             e.preventDefault();
-            try {
-              const r = await api.quickSale(weightSaleId, {
-                weightDisplay: Number(weightInput),
-                confirmDuplicate: true,
-              });
-              setWeightSaleId(null);
-              router.push(`/merchant/receipts/${r.payment.id}`);
-            } catch (err) {
-              setError(err instanceof Error ? err.message : "Sale failed");
+            const id = weightSaleId;
+            async function sell(acceptMarginWarning = false) {
+              try {
+                const r = await api.quickSale(id!, {
+                  weightDisplay: Number(weightInput),
+                  confirmDuplicate: true,
+                  acceptMarginWarning,
+                });
+                setWeightSaleId(null);
+                router.push(`/merchant/receipts/${r.payment.id}`);
+              } catch (err) {
+                const er = err as Error & {
+                  status?: number;
+                  body?: { error?: string; message?: string; margin?: { message: string | null } };
+                };
+                if (er.status === 409 && er.body?.error === "margin_guard" && !acceptMarginWarning) {
+                  const ok = window.confirm(
+                    `${er.body.margin?.message ?? er.message}\n\nProceed with sale anyway?`
+                  );
+                  if (ok) return sell(true);
+                }
+                setError(er.message || "Sale failed");
+              }
             }
+            await sell();
           }}
         >
           <label className="text-sm">

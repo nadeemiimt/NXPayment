@@ -8,7 +8,7 @@ import {
   previewPricing,
   updateInventoryItem,
 } from "../services/inventory.js";
-import { quickSale } from "../services/sales.js";
+import { MarginGuardError, previewSaleMargin, quickSale } from "../services/sales.js";
 import {
   createLocation,
   createShop,
@@ -40,6 +40,8 @@ const shopSchema = z.object({
     .regex(/^[a-zA-Z0-9.\-_]{2,}@[a-zA-Z]{2,}$/)
     .nullable()
     .optional(),
+  minMarginPercent: z.number().min(0).max(100).optional(),
+  underMarginMode: z.enum(["warn", "block"]).optional(),
 });
 
 const locationSchema = z.object({
@@ -288,6 +290,34 @@ export async function shopRoutes(app: FastifyInstance) {
     }
   });
 
+  app.post("/api/merchant/inventory/:id/preview-margin", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const parsed = z
+      .object({
+        qty: z.number().positive().optional(),
+        weightDisplay: z.number().positive().optional(),
+        shopId: z.string().optional(),
+      })
+      .safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "invalid_body", details: parsed.error.flatten() });
+    }
+    try {
+      return {
+        margin: previewSaleMargin({
+          inventoryItemId: id,
+          qty: parsed.data.qty,
+          weightDisplay: parsed.data.weightDisplay,
+          shopId: parsed.data.shopId,
+        }),
+      };
+    } catch (err) {
+      return reply
+        .code(400)
+        .send({ error: "preview_failed", message: (err as Error).message });
+    }
+  });
+
   app.post("/api/merchant/inventory/:id/quick-sale", async (req, reply) => {
     if (!getStaffSettings().canSellAndConfirm) {
       return reply.code(403).send({ error: "forbidden" });
@@ -301,6 +331,7 @@ export async function shopRoutes(app: FastifyInstance) {
         note: z.string().max(256).optional(),
         customerId: z.string().optional(),
         pointsToRedeem: z.number().int().nonnegative().optional(),
+        acceptMarginWarning: z.boolean().optional(),
       })
       .safeParse(req.body ?? {});
     if (!parsed.success) {
@@ -313,6 +344,7 @@ export async function shopRoutes(app: FastifyInstance) {
         weightDisplay: parsed.data.weightDisplay,
         confirmDuplicate: parsed.data.confirmDuplicate,
         note: parsed.data.note,
+        acceptMarginWarning: parsed.data.acceptMarginWarning,
       });
 
       let loyalty = null;
@@ -328,6 +360,14 @@ export async function shopRoutes(app: FastifyInstance) {
 
       return reply.code(201).send({ ...result, loyalty });
     } catch (err) {
+      if (err instanceof MarginGuardError) {
+        const code = err.margin.action === "block" ? 400 : 409;
+        return reply.code(code).send({
+          error: "margin_guard",
+          message: err.margin.message,
+          margin: err.margin,
+        });
+      }
       return reply
         .code(400)
         .send({ error: "quick_sale_failed", message: (err as Error).message });

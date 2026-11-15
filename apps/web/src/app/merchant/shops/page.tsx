@@ -46,12 +46,19 @@ export default function ShopsPage() {
   const [vpa, setVpa] = useState("");
   const [locations, setLocations] = useState<Location[]>([]);
   const [locName, setLocName] = useState("");
+  const [minMargin, setMinMargin] = useState("0");
+  const [underMode, setUnderMode] = useState<"warn" | "block">("warn");
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const r = await api.listShops();
     setShops(r.shops);
     setActiveId(r.activeShopId);
+    const active = r.shops.find((s) => s.id === r.activeShopId);
+    if (active) {
+      setMinMargin(String(active.minMarginPercent ?? 0));
+      setUnderMode(active.underMarginMode ?? "warn");
+    }
     if (r.activeShopId) {
       const loc = await api.listLocations(r.activeShopId);
       setLocations(loc.locations);
@@ -137,6 +144,7 @@ export default function ShopsPage() {
               <p className="text-sm text-[var(--nx-muted)]">
                 {s.businessType}
                 {s.vpaOverride ? ` · ${s.vpaOverride}` : ""}
+                {` · min margin ${s.minMarginPercent ?? 0}% (${s.underMarginMode ?? "warn"})`}
               </p>
             </div>
             <div className="flex gap-2">
@@ -173,6 +181,42 @@ export default function ShopsPage() {
           </li>
         ))}
       </ul>
+
+      <h2 className="font-display mt-12 text-2xl">Margin guard (active shop)</h2>
+      <p className="mt-1 max-w-xl text-sm text-[var(--nx-muted)]">
+        Before inventory/quick-sale QR: block sell below cost; warn or block under min margin %.
+      </p>
+      <form
+        className="mt-4 flex max-w-md flex-wrap gap-2"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (!activeId) return;
+          await api.updateShop(activeId, {
+            minMarginPercent: Number(minMargin),
+            underMarginMode: underMode,
+          });
+          await load();
+        }}
+      >
+        <Input
+          type="number"
+          step="any"
+          min={0}
+          max={100}
+          value={minMargin}
+          onChange={(e) => setMinMargin(e.target.value)}
+          placeholder="Min margin %"
+        />
+        <select
+          className="h-11 rounded-md border border-[var(--nx-line)] bg-white/80 px-3"
+          value={underMode}
+          onChange={(e) => setUnderMode(e.target.value as "warn" | "block")}
+        >
+          <option value="warn">Warn under margin</option>
+          <option value="block">Block under margin</option>
+        </select>
+        <Button type="submit">Save margin</Button>
+      </form>
 
       <h2 className="font-display mt-12 text-2xl">Locations (active shop)</h2>
       <form

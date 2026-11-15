@@ -6,6 +6,7 @@ import {
   type LoyaltyCustomer,
   type LoyaltyNudge,
   type LoyaltyRules,
+  type NextBestOffer,
 } from "@/lib/api";
 import { formatInr } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,10 @@ export default function LoyaltyPage() {
   const [rules, setRules] = useState<LoyaltyRules | null>(null);
   const [customers, setCustomers] = useState<LoyaltyCustomer[]>([]);
   const [nudges, setNudges] = useState<LoyaltyNudge[]>([]);
+  const [offers, setOffers] = useState<NextBestOffer[]>([]);
+  const [lookupPhone, setLookupPhone] = useState("");
+  const [lookupOffer, setLookupOffer] = useState<NextBestOffer | null>(null);
+  const [lookupCustomer, setLookupCustomer] = useState<LoyaltyCustomer | null>(null);
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [pointsPerRupee, setPointsPerRupee] = useState("1");
@@ -35,6 +40,16 @@ export default function LoyaltyPage() {
     setStampVisits(String(r.rules.stampVisitsRequired));
     setCustomers(c.customers);
     setNudges(n.nudges);
+    const nextOffers: NextBestOffer[] = [];
+    for (const cust of c.customers.slice(0, 30)) {
+      try {
+        const o = await api.getNextBestOffer(cust.id);
+        nextOffers.push(o.offer);
+      } catch {
+        /* skip */
+      }
+    }
+    setOffers(nextOffers);
   }, []);
 
   useEffect(() => {
@@ -115,6 +130,107 @@ export default function LoyaltyPage() {
         <Input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
         <Button type="submit">Enroll</Button>
       </form>
+
+      <h2 className="font-display mt-10 text-2xl">Checkout lookup</h2>
+      <form
+        className="mt-4 flex max-w-xl flex-wrap gap-2"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setError(null);
+          try {
+            const r = await api.lookupLoyaltyByPhone(lookupPhone);
+            setLookupCustomer(r.customer);
+            setLookupOffer(r.nextBestOffer);
+          } catch (err) {
+            setLookupCustomer(null);
+            setLookupOffer(null);
+            setError(err instanceof Error ? err.message : "Not found");
+          }
+        }}
+      >
+        <Input
+          required
+          placeholder="Phone at checkout"
+          value={lookupPhone}
+          onChange={(e) => setLookupPhone(e.target.value)}
+        />
+        <Button type="submit">Lookup</Button>
+      </form>
+      {lookupCustomer && (
+        <div className="mt-3 max-w-xl rounded-lg border border-[var(--nx-line)] bg-white/50 p-4 text-sm">
+          <p className="font-medium">
+            {lookupCustomer.name || lookupCustomer.phone} · {lookupCustomer.points} pts ·{" "}
+            {lookupCustomer.tier}
+          </p>
+          {lookupOffer ? (
+            <div className="mt-2">
+              <p className="text-[var(--nx-accent)]">{lookupOffer.title}</p>
+              <p className="text-[var(--nx-muted)]">{lookupOffer.reason}</p>
+              <Button
+                className="mt-2"
+                size="sm"
+                type="button"
+                onClick={async () => {
+                  const r = await api.acceptLoyaltyOffer(lookupCustomer.id, {
+                    offerId: lookupOffer.id,
+                    kind: lookupOffer.kind,
+                    discountPaise: lookupOffer.discountPaise,
+                    pointsBonus: lookupOffer.pointsBonus,
+                  });
+                  setMsg(
+                    `Offer applied: +${r.result.applied.pointsAdded} pts` +
+                      (r.result.applied.discountPaise
+                        ? ` / ${formatInr(r.result.applied.discountPaise)} discount`
+                        : "")
+                  );
+                  setLookupOffer(null);
+                  await load();
+                }}
+              >
+                Accept & redeem
+              </Button>
+            </div>
+          ) : (
+            <p className="mt-1 text-[var(--nx-muted)]">No offer right now.</p>
+          )}
+        </div>
+      )}
+
+      <h2 className="font-display mt-10 text-2xl">Next-best offers</h2>
+      <div className="mt-4 space-y-3">
+        {offers.map((o) => (
+          <article
+            key={o.id}
+            className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-[var(--nx-line)] bg-white/50 p-4"
+          >
+            <div>
+              <p className="font-medium">{o.title}</p>
+              <p className="text-sm text-[var(--nx-muted)]">{o.reason}</p>
+            </div>
+            <Button
+              size="sm"
+              type="button"
+              onClick={async () => {
+                const r = await api.acceptLoyaltyOffer(o.customerId, {
+                  offerId: o.id,
+                  kind: o.kind,
+                  discountPaise: o.discountPaise,
+                  pointsBonus: o.pointsBonus,
+                });
+                setMsg(`Applied ${r.result.offer.title}`);
+                await load();
+              }}
+            >
+              Accept
+            </Button>
+          </article>
+        ))}
+        {offers.length === 0 && (
+          <p className="text-sm text-[var(--nx-muted)]">
+            Enroll customers to generate next-best offers.
+          </p>
+        )}
+      </div>
 
       <h2 className="font-display mt-10 text-2xl">Customers</h2>
       <ul className="mt-4 space-y-3">

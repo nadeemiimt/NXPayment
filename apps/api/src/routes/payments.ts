@@ -1,6 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
+  getPendingWithAssists,
+  markCreditMatched,
+  recordObservedCredit,
+} from "../services/confirm-assist.js";
+import {
   SameAmountInProgressError,
   cancelPayment,
   createPayment,
@@ -64,6 +69,27 @@ export async function paymentRoutes(app: FastifyInstance) {
     return { payments: listPendingConfirms() };
   });
 
+  app.get("/api/payments/pending/assist", async () => {
+    return getPendingWithAssists();
+  });
+
+  app.post("/api/payments/observed-credits", async (req, reply) => {
+    const parsed = z
+      .object({
+        amountPaise: z.number().int().positive(),
+        observedAt: z.string().optional(),
+        utr: z.string().max(64).nullable().optional(),
+        source: z.string().max(64).nullable().optional(),
+        note: z.string().max(256).nullable().optional(),
+      })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "invalid_body", details: parsed.error.flatten() });
+    }
+    const credit = recordObservedCredit(parsed.data);
+    return reply.code(201).send({ credit, assist: getPendingWithAssists() });
+  });
+
   app.get("/api/payments/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
     const payment = getPayment(id);
@@ -73,8 +99,12 @@ export async function paymentRoutes(app: FastifyInstance) {
 
   app.post("/api/payments/:id/confirm", async (req, reply) => {
     const { id } = req.params as { id: string };
+    const body = (req.body ?? {}) as { creditId?: string };
     try {
       const payment = await merchantConfirm(id);
+      if (body.creditId) {
+        markCreditMatched(body.creditId, id);
+      }
       return { payment, circuit: sideEffectBreaker.getStatus() };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
