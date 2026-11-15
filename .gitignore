@@ -13,3 +13,7 @@ apps/mobile/.flutter-plugins-dependencies
 apps/mobile/.packages
 .idea/
 .vscode/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

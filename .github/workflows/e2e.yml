@@ -1,0 +1,62 @@
+name: E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  playwright:
+    name: Playwright (Chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: "true"
+      E2E_API_PORT: "3847"
+      E2E_WEB_PORT: "4321"
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:3847
+      # Hermetic — no real mailbox / WhatsApp / LLM
+      GMAIL_CLIENT_ID: ""
+      GMAIL_CLIENT_SECRET: ""
+      GMAIL_REFRESH_TOKEN: ""
+      WHATSAPP_TOKEN: ""
+      WHATSAPP_PHONE_NUMBER_ID: ""
+      META_ACCESS_TOKEN: ""
+      INSIGHTS_LLM_KEY: ""
+      INSIGHTS_LLM_URL: ""
+      WEBHOOK_URL: ""
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build web
+        run: npm run build --workspace=@nxpayment/web
+
+      - name: Run Playwright
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

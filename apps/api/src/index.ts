@@ -18,7 +18,11 @@ const app = Fastify({
   logger: true,
 });
 
-await app.register(cors, { origin: config.corsOrigin === "*" ? true : config.corsOrigin });
+await app.register(cors, {
+  origin: config.corsOrigin === "*" ? true : config.corsOrigin,
+  // Browser preflight for merchant config / storage / inventory updates
+  methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+});
 await app.register(sensible);
 
 getDb();
