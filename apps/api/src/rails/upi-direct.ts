@@ -1,4 +1,4 @@
-import { buildUpiUri, paiseToRupees } from "../../../../packages/shared/src/index.ts";
+import { buildUpiUri, paiseToRupees } from "@nxpayment/shared";
 import type { CheckoutPresentation, PaymentRail, PaymentSession, RailHealth } from "./types.js";
 
 export const upiDirectRail: PaymentRail = {

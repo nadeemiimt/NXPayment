@@ -48,3 +48,102 @@ body {
 .nx-wait-dot {
   animation: nx-pulse 1.4s ease-in-out infinite;
 }
+
+/* Counter / kiosk display */
+.kiosk-root {
+  background:
+    radial-gradient(900px 500px at 15% 10%, rgba(196, 240, 106, 0.12), transparent 55%),
+    radial-gradient(700px 400px at 90% 80%, rgba(240, 217, 168, 0.1), transparent 50%),
+    linear-gradient(165deg, #0c1610 0%, #15241a 45%, #0a120e 100%);
+  font-family: var(--font-sans);
+  color: #e8f0e4;
+  min-height: 100vh;
+}
+.font-kiosk-brand,
+.font-kiosk-amount {
+  font-family: var(--font-display);
+}
+.kiosk-glow {
+  position: absolute;
+  inset: -20% auto auto 40%;
+  width: 50vw;
+  height: 50vw;
+  background: radial-gradient(circle, rgba(196, 240, 106, 0.08), transparent 70%);
+  filter: blur(40px);
+  animation: kiosk-drift 12s ease-in-out infinite alternate;
+}
+.kiosk-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(156, 184, 154, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(156, 184, 154, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at center, black 20%, transparent 75%);
+  pointer-events: none;
+}
+.kiosk-rise {
+  animation: kiosk-rise 0.7s ease-out both;
+}
+.kiosk-pulse {
+  animation: nx-pulse 1.4s ease-in-out infinite;
+}
+.kiosk-pulse-text {
+  animation: nx-pulse 1.6s ease-in-out infinite;
+}
+@keyframes kiosk-rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes kiosk-drift {
+  from { transform: translate(-8%, 0); }
+  to { transform: translate(8%, 6%); }
+}
+
+/* Thermal receipt print */
+.receipt-sheet {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.35;
+  background: #fff;
+  color: #111;
+  padding: 12px;
+  margin: 0 auto;
+  border: 1px dashed var(--nx-line);
+}
+.receipt-58 { width: 58mm; max-width: 58mm; }
+.receipt-80 { width: 80mm; max-width: 80mm; }
+.receipt-center { text-align: center; }
+.receipt-shop { font-size: 14px; font-weight: 700; margin: 4px 0; }
+.receipt-muted { color: #444; font-size: 11px; }
+.receipt-rule { border: none; border-top: 1px dashed #999; margin: 8px 0; }
+.receipt-row { display: flex; justify-content: space-between; gap: 8px; }
+.receipt-total { font-weight: 700; font-size: 13px; }
+
+@media print {
+  body {
+    background: #fff !important;
+  }
+  .no-print,
+  header,
+  nav,
+  .site-header,
+  [data-merchant-nav] {
+    display: none !important;
+  }
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .receipt-sheet {
+    border: none;
+    margin: 0;
+    padding: 0;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  @page {
+    margin: 4mm;
+    size: auto;
+  }
+}

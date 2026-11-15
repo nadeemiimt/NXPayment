@@ -12,6 +12,11 @@
     "dev:api": "npm run dev --workspace=@nxpayment/api",
     "dev:web": "npm run dev --workspace=@nxpayment/web",
     "start:api": "npm run start --workspace=@nxpayment/api",
-    "typecheck:api": "npm run typecheck --workspace=@nxpayment/api"
+    "typecheck:api": "npm run typecheck --workspace=@nxpayment/api",
+    "test:api": "npm run test --workspace=@nxpayment/api",
+    "require-node20": "node scripts/require-node20.js"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

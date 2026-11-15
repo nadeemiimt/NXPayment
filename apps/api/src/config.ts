@@ -32,4 +32,7 @@ export const config = {
   circuitFailureThreshold: Number(process.env.CIRCUIT_FAILURE_THRESHOLD ?? 5),
   circuitResetMs: Number(process.env.CIRCUIT_RESET_MS ?? 30_000),
   corsOrigin: process.env.CORS_ORIGIN ?? "*",
+  insightsLlmKey: process.env.INSIGHTS_LLM_KEY ?? "",
+  insightsLlmUrl: process.env.INSIGHTS_LLM_URL ?? "",
+  storageBackupIntervalMs: Number(process.env.STORAGE_BACKUP_INTERVAL_MS ?? 5 * 60 * 1000),
 };
