@@ -28,7 +28,7 @@ export function ShopSwitcher() {
     <label className="flex items-center gap-2 text-sm">
       <span className="text-[var(--nx-muted)]">Shop</span>
       <select
-        className="h-9 rounded-md border border-[var(--nx-line)] bg-white/80 px-2"
+        className="h-11 min-w-0 max-w-[11rem] rounded-md border border-[var(--nx-line)] bg-white/80 px-2 text-base sm:h-9 sm:max-w-none sm:text-sm"
         disabled={busy}
         value={activeId ?? ""}
         onChange={async (e) => {
