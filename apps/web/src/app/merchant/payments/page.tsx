@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { api, type Payment } from "@/lib/api";
 import { formatInr } from "@/lib/utils";
 
@@ -18,11 +19,13 @@ export default function PaymentsPage() {
   return (
     <div>
       <h1 className="font-display text-3xl font-semibold">Payments</h1>
-      <p className="mt-2 text-[var(--nx-muted)]">Recent payment sessions for this install.</p>
+      <p className="mt-2 text-[var(--nx-muted)]">
+        Recent payment sessions. Print a thermal receipt from any settled sale.
+      </p>
       {error && <p className="mt-3 text-sm text-[#9B2C2C]">{error}</p>}
 
       <div className="mt-6 overflow-x-auto rounded-xl border border-[var(--nx-line)] bg-white/60">
-        <table className="w-full min-w-[640px] text-left text-sm">
+        <table className="w-full min-w-[720px] text-left text-sm">
           <thead className="border-b border-[var(--nx-line)] text-xs uppercase tracking-wider text-[var(--nx-muted)]">
             <tr>
               <th className="px-4 py-3">Amount</th>
@@ -30,6 +33,7 @@ export default function PaymentsPage() {
               <th className="px-4 py-3">Order / note</th>
               <th className="px-4 py-3">Created</th>
               <th className="px-4 py-3">Id</th>
+              <th className="px-4 py-3"> </th>
             </tr>
           </thead>
           <tbody>
@@ -46,11 +50,19 @@ export default function PaymentsPage() {
                   {new Date(p.createdAt).toLocaleString()}
                 </td>
                 <td className="px-4 py-3 font-mono text-xs">{p.id.slice(0, 10)}</td>
+                <td className="px-4 py-3">
+                  <Link
+                    href={`/merchant/receipts/${p.id}`}
+                    className="text-[var(--nx-accent)] underline"
+                  >
+                    Receipt
+                  </Link>
+                </td>
               </tr>
             ))}
             {payments.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-[var(--nx-muted)]">
+                <td colSpan={6} className="px-4 py-10 text-center text-[var(--nx-muted)]">
                   No payments yet.
                 </td>
               </tr>

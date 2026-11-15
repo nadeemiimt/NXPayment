@@ -1,0 +1,183 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import {
+  api,
+  type BusinessType,
+  type Location,
+  type Shop,
+} from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+
+export default function ShopsPage() {
+  const [shops, setShops] = useState<Shop[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [businessType, setBusinessType] = useState<BusinessType>("retail");
+  const [vpa, setVpa] = useState("");
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [locName, setLocName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    const r = await api.listShops();
+    setShops(r.shops);
+    setActiveId(r.activeShopId);
+    if (r.activeShopId) {
+      const loc = await api.listLocations(r.activeShopId);
+      setLocations(loc.locations);
+    }
+  }, []);
+
+  useEffect(() => {
+    load().catch((e) => setError(e.message));
+    const onChange = () => load().catch(() => undefined);
+    window.addEventListener("nx-shop-changed", onChange);
+    return () => window.removeEventListener("nx-shop-changed", onChange);
+  }, [load]);
+
+  return (
+    <div>
+      <h1 className="font-display text-3xl font-semibold">Shops & locations</h1>
+      <p className="mt-2 max-w-2xl text-[var(--nx-muted)]">
+        Multi-outlet install. Optional per-shop VPA override stub (falls back to merchant primary).
+        Pharmacy type unlocks batch/expiry fields on inventory.
+      </p>
+      {error && <p className="mt-3 text-sm text-[#9B2C2C]">{error}</p>}
+
+      <form
+        className="mt-8 grid max-w-2xl gap-3 sm:grid-cols-2"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setError(null);
+          try {
+            await api.createShop({
+              name,
+              businessType,
+              vpaOverride: vpa.trim() || null,
+            });
+            setName("");
+            setVpa("");
+            await load();
+          } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed");
+          }
+        }}
+      >
+        <Input
+          required
+          placeholder="Shop / outlet name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <select
+          className="h-11 rounded-md border border-[var(--nx-line)] bg-white/80 px-3"
+          value={businessType}
+          onChange={(e) => setBusinessType(e.target.value as BusinessType)}
+        >
+          <option value="retail">Retail</option>
+          <option value="restaurant">Restaurant / café</option>
+          <option value="pharmacy">Pharmacy</option>
+        </select>
+        <Input
+          className="sm:col-span-2"
+          placeholder="Optional VPA override (stub)"
+          value={vpa}
+          onChange={(e) => setVpa(e.target.value)}
+        />
+        <Button type="submit">Add shop</Button>
+      </form>
+
+      <ul className="mt-8 space-y-3">
+        {shops.map((s) => (
+          <li
+            key={s.id}
+            className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--nx-line)] py-3"
+          >
+            <div>
+              <p className="font-medium">
+                {s.name}{" "}
+                {s.isActive && (
+                  <span className="text-xs text-[var(--nx-accent)]">active</span>
+                )}
+              </p>
+              <p className="text-sm text-[var(--nx-muted)]">
+                {s.businessType}
+                {s.vpaOverride ? ` · ${s.vpaOverride}` : ""}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {!s.isActive && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  type="button"
+                  onClick={async () => {
+                    await api.activateShop(s.id);
+                    window.dispatchEvent(new Event("nx-shop-changed"));
+                    await load();
+                  }}
+                >
+                  Activate
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                type="button"
+                onClick={async () => {
+                  try {
+                    await api.deleteShop(s.id);
+                    await load();
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : "Delete failed");
+                  }
+                }}
+              >
+                Delete
+              </Button>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <h2 className="font-display mt-12 text-2xl">Locations (active shop)</h2>
+      <form
+        className="mt-4 flex max-w-md gap-2"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (!activeId) return;
+          await api.createLocation({ name: locName, shopId: activeId });
+          setLocName("");
+          await load();
+        }}
+      >
+        <Input
+          required
+          placeholder="Shelf, kitchen, storefront…"
+          value={locName}
+          onChange={(e) => setLocName(e.target.value)}
+        />
+        <Button type="submit">Add</Button>
+      </form>
+      <ul className="mt-4 space-y-2">
+        {locations.map((l) => (
+          <li key={l.id} className="flex items-center justify-between text-sm">
+            <span>{l.name}</span>
+            <button
+              type="button"
+              className="text-[var(--nx-muted)] underline"
+              onClick={async () => {
+                await api.deleteLocation(l.id);
+                await load();
+              }}
+            >
+              Remove
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}

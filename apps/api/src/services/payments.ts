@@ -4,10 +4,12 @@ import {
   type PaymentDto,
   type PaymentStatus,
   type TallyReport,
-} from "../../../../packages/shared/src/index.ts";
+} from "@nxpayment/shared";
 import { config } from "../config.js";
 import { getDb } from "../db/schema.js";
+import { computeGst } from "../lib/money-gst.js";
 import { upiDirectRail } from "../rails/upi-direct.js";
+import { getGstSettings } from "./gst-settings.js";
 import { resolveReceivingVpa } from "./merchant.js";
 import { dispatchTerminalWebhook } from "./webhooks.js";
 
@@ -28,6 +30,14 @@ interface PaymentRow {
   expires_at: string;
   confirmed_at: string | null;
   failure_reason: string | null;
+  shop_id?: string | null;
+  taxable_paise?: number | null;
+  cgst_paise?: number | null;
+  sgst_paise?: number | null;
+  igst_paise?: number | null;
+  gst_rate_percent?: number | null;
+  gst_split_mode?: string | null;
+  gst_price_mode?: string | null;
 }
 
 function toDto(row: PaymentRow): PaymentDto {
@@ -81,6 +91,7 @@ export async function createPayment(input: {
   note?: string;
   idempotencyKey?: string;
   confirmDuplicate?: boolean;
+  shopId?: string | null;
 }): Promise<PaymentDto> {
   if (!Number.isInteger(input.amountPaise) || input.amountPaise <= 0) {
     throw new Error("amountPaise must be a positive integer");
@@ -98,7 +109,7 @@ export async function createPayment(input: {
     throw new SameAmountInProgressError(conflicts);
   }
 
-  const receiving = resolveReceivingVpa();
+  const receiving = resolveReceivingVpa(input.shopId);
   const id = nanoid(16);
   const now = new Date();
   const expiresAt = new Date(now.getTime() + config.paymentTtlMs);
@@ -116,11 +127,11 @@ export async function createPayment(input: {
       `INSERT INTO payments (
         id, merchant_order_id, amount_paise, currency, status, note,
         receiving_vpa, receiving_name, upi_uri, idempotency_key, confirm_duplicate,
-        created_at, updated_at, expires_at, confirmed_at, failure_reason
+        created_at, updated_at, expires_at, confirmed_at, failure_reason, shop_id
       ) VALUES (
         @id, @merchant_order_id, @amount_paise, 'INR', 'ACTIVE', @note,
         @receiving_vpa, @receiving_name, @upi_uri, @idempotency_key, @confirm_duplicate,
-        @created_at, @updated_at, @expires_at, NULL, NULL
+        @created_at, @updated_at, @expires_at, NULL, NULL, @shop_id
       )`
     )
     .run({
@@ -136,10 +147,38 @@ export async function createPayment(input: {
       created_at: now.toISOString(),
       updated_at: now.toISOString(),
       expires_at: expiresAt.toISOString(),
+      shop_id: receiving.shopId,
     });
 
-  audit(id, "created", `amount=${input.amountPaise}`);
+  audit(id, "created", `amount=${input.amountPaise};shop=${receiving.shopId ?? ""}`);
   return getPayment(id)!;
+}
+
+function snapshotGstOnSettle(id: string, amountPaise: number) {
+  const gst = getGstSettings();
+  const breakdown = computeGst({
+    amountPaise,
+    ratePercent: gst.ratePercent,
+    splitMode: gst.splitMode,
+    priceMode: gst.priceMode,
+  });
+  getDb()
+    .prepare(
+      `UPDATE payments SET
+        taxable_paise = ?, cgst_paise = ?, sgst_paise = ?, igst_paise = ?,
+        gst_rate_percent = ?, gst_split_mode = ?, gst_price_mode = ?
+       WHERE id = ?`
+    )
+    .run(
+      breakdown.taxablePaise,
+      breakdown.cgstPaise,
+      breakdown.sgstPaise,
+      breakdown.igstPaise,
+      breakdown.ratePercent,
+      breakdown.splitMode,
+      breakdown.priceMode,
+      id
+    );
 }
 
 export function getPayment(id: string): PaymentDto | null {
@@ -218,6 +257,8 @@ export async function merchantConfirm(id: string): Promise<PaymentDto> {
       .run(new Date().toISOString(), id);
     audit(id, "status:PROCESSING", "merchant confirm started");
   }
+  // Immutable tax snapshot at settle
+  snapshotGstOnSettle(id, current.amountPaise);
   return transition(id, ["ACTIVE", "PROCESSING"], "SUCCESS", {
     confirmedAt: new Date().toISOString(),
   });
@@ -266,15 +307,22 @@ export function expireDuePayments(): number {
   return due.length;
 }
 
-export function getTally(fromIso: string, toIso: string): TallyReport {
+export function getTally(
+  fromIso: string,
+  toIso: string,
+  shopId?: string | null
+): TallyReport {
+  const shopSql = shopId ? " AND shop_id = ?" : "";
+  const params: unknown[] = [fromIso, toIso];
+  if (shopId) params.push(shopId);
   const rows = getDb()
     .prepare(
       `SELECT status, COUNT(*) as cnt, COALESCE(SUM(CASE WHEN status = 'SUCCESS' THEN amount_paise ELSE 0 END), 0) as sales
        FROM payments
-       WHERE created_at >= ? AND created_at <= ?
+       WHERE created_at >= ? AND created_at <= ?${shopSql}
        GROUP BY status`
     )
-    .all(fromIso, toIso) as { status: PaymentStatus; cnt: number; sales: number }[];
+    .all(...params) as { status: PaymentStatus; cnt: number; sales: number }[];
 
   const tally: TallyReport = {
     from: fromIso,
@@ -297,16 +345,6 @@ export function getTally(fromIso: string, toIso: string): TallyReport {
     else if (r.status === "CANCELLED") tally.cancelledCount = r.cnt;
   }
   return tally;
-}
-
-/** GST extension stub — do not integrate GST in MVP. */
-export async function gstExportStub(from: string, to: string) {
-  return {
-    stub: true as const,
-    message: "GST export adapter not implemented in MVP",
-    from,
-    to,
-  };
 }
 
 /** Reconciliation extension stub. */

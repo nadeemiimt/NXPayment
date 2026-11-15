@@ -6,13 +6,13 @@ import {
   createPayment,
   getPayment,
   getTally,
-  gstExportStub,
   listPayments,
   listPendingConfirms,
   merchantConfirm,
   merchantReject,
   reconciliationStub,
 } from "../services/payments.js";
+import { getActiveShop } from "../services/shops.js";
 import { sideEffectBreaker } from "../services/webhooks.js";
 
 const createSchema = z.object({
@@ -21,6 +21,7 @@ const createSchema = z.object({
   note: z.string().max(256).optional(),
   idempotencyKey: z.string().min(8).max(128).optional(),
   confirmDuplicate: z.boolean().optional(),
+  shopId: z.string().min(1).optional(),
 });
 
 export async function paymentRoutes(app: FastifyInstance) {
@@ -30,7 +31,10 @@ export async function paymentRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: "invalid_body", details: parsed.error.flatten() });
     }
     try {
-      const payment = await createPayment(parsed.data);
+      const payment = await createPayment({
+        ...parsed.data,
+        shopId: parsed.data.shopId ?? getActiveShop()?.id ?? null,
+      });
       return reply.code(201).send({ payment });
     } catch (err) {
       if (err instanceof SameAmountInProgressError) {
@@ -102,16 +106,13 @@ export async function paymentRoutes(app: FastifyInstance) {
   });
 
   app.get("/api/reports/tally", async (req) => {
-    const q = req.query as { from?: string; to?: string };
+    const q = req.query as { from?: string; to?: string; shopId?: string };
     const to = q.to ?? new Date().toISOString();
     const from =
       q.from ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    return { tally: getTally(from, to) };
-  });
-
-  app.get("/api/reports/gst-export", async (req) => {
-    const q = req.query as { from?: string; to?: string };
-    return gstExportStub(q.from ?? "", q.to ?? "");
+    const shopId =
+      q.shopId === "all" ? null : (q.shopId ?? getActiveShop()?.id ?? null);
+    return { tally: getTally(from, to, shopId) };
   });
 
   app.post("/api/reports/reconciliation", async () => {

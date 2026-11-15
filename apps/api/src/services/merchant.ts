@@ -1,5 +1,6 @@
 import { config } from "../config.js";
 import { getDb } from "../db/schema.js";
+import { getActiveShop, getShop } from "./shops.js";
 
 export interface MerchantConfigRow {
   primary_vpa: string;
@@ -73,7 +74,23 @@ export function updateMerchantConfig(input: {
   return getMerchantConfig();
 }
 
-export function resolveReceivingVpa(): { vpa: string; name: string } {
+export function resolveReceivingVpa(shopId?: string | null): {
+  vpa: string;
+  name: string;
+  shopId: string | null;
+} {
   const m = getMerchantConfig();
-  return { vpa: m.primaryVpa, name: m.displayName };
+  let vpa = m.primaryVpa;
+  let name = m.displayName;
+  let resolvedShopId: string | null = shopId ?? null;
+
+  const shop = shopId ? getShop(shopId) : getActiveShop();
+  if (shop) {
+    resolvedShopId = shop.id;
+    name = shop.name || name;
+    // Optional per-shop VPA override stub — falls back to merchant primary
+    if (shop.vpaOverride) vpa = shop.vpaOverride;
+  }
+
+  return { vpa, name, shopId: resolvedShopId };
 }

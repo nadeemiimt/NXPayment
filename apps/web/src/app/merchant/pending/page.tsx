@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { api, type Payment } from "@/lib/api";
 import { formatInr } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 export default function PendingPage() {
+  const router = useRouter();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -25,8 +27,12 @@ export default function PendingPage() {
     setBusyId(id);
     setError(null);
     try {
-      if (kind === "confirm") await api.confirm(id);
-      else await api.reject(id, "Rejected by merchant");
+      if (kind === "confirm") {
+        await api.confirm(id);
+        router.push(`/merchant/receipts/${id}`);
+        return;
+      }
+      await api.reject(id, "Rejected by merchant");
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Action failed");
@@ -39,8 +45,8 @@ export default function PendingPage() {
     <div>
       <h1 className="font-display text-3xl font-semibold">Pending confirms</h1>
       <p className="mt-2 text-[var(--nx-muted)]">
-        Buyer already paid (or will pay) to your VPA. Confirm only when you see the credit —
-        or trust your till.
+        Buyer already paid (or will pay) to your VPA. Confirm only when you see the credit — or trust
+        your till. Confirm opens a thermal receipt for Print.
       </p>
       {error && <p className="mt-3 text-sm text-[#9B2C2C]">{error}</p>}
 
@@ -74,7 +80,7 @@ export default function PendingPage() {
                   disabled={busyId === p.id}
                   onClick={() => act(p.id, "confirm")}
                 >
-                  Confirm
+                  Confirm & print
                 </Button>
                 <Button
                   size="lg"
