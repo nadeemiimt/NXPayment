@@ -21,8 +21,8 @@ test.describe("Merchant onboarding / home", () => {
     expect(isAbsentRoute(res)).toBeFalsy();
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await expect(page.getByRole("link", { name: /Review pending/i })).toBeVisible();
-    // Nav + CTA both link to inventory — assert the home CTA button-styled link
-    await expect(page.locator("a.inline-flex", { hasText: /^Inventory$/ })).toBeVisible();
+    // Home CTA only (nav also has Inventory in desktop + mobile shells)
+    await expect(page.locator('a.h-14[href="/merchant/inventory"]')).toBeVisible();
     await expect(page.getByRole("button", { name: /Generate display code/i })).toBeVisible();
   });
 });
