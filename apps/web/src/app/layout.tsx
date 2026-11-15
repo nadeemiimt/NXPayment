@@ -4,6 +4,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "NXPayment",
   description: "Direct-to-merchant UPI checkout software",
+  icons: {
+    icon: "/nx-logo.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

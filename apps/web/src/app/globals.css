@@ -3,28 +3,34 @@
 @tailwind utilities;
 
 :root {
-  --nx-ink: #14201b;
-  --nx-paper: #f3efe6;
-  --nx-mist: #e5eee8;
-  --nx-muted: #5c6b63;
-  --nx-line: #c8d5cc;
+  --nx-ink: #0e1a16;
+  --nx-paper: #eef3ef;
+  --nx-mist: #dfeae3;
+  --nx-muted: #4f6358;
+  --nx-line: #b9cbc0;
   --nx-accent: #0b6e4f;
   --nx-accent-dark: #08553c;
-  --nx-sand: #d8c3a5;
+  --nx-glow: #1a9b6f;
+  --nx-sand: #c5d4c8;
   --background: var(--nx-paper);
   --foreground: var(--nx-ink);
   --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Fraunces", ui-serif, Georgia, serif;
 }
 
+html {
+  overflow-x: hidden;
+}
+
 body {
   font-family: var(--font-sans);
   color: var(--nx-ink);
   background:
-    radial-gradient(1200px 600px at 10% -10%, rgba(11, 110, 79, 0.18), transparent 55%),
-    radial-gradient(900px 500px at 100% 0%, rgba(216, 195, 165, 0.45), transparent 50%),
-    linear-gradient(180deg, #ebe6db 0%, var(--nx-paper) 40%, #e7efe9 100%);
+    radial-gradient(1100px 560px at 8% -8%, rgba(11, 110, 79, 0.2), transparent 55%),
+    radial-gradient(900px 480px at 100% 0%, rgba(26, 155, 111, 0.12), transparent 50%),
+    linear-gradient(180deg, #e6efe9 0%, var(--nx-paper) 42%, #e3ebe6 100%);
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 .nx-grain {
@@ -47,6 +53,95 @@ body {
 
 .nx-wait-dot {
   animation: nx-pulse 1.4s ease-in-out infinite;
+}
+
+/* Atmospheric mesh for checkout + merchant shells */
+.nx-atmosphere {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.nx-atmosphere__mesh {
+  position: absolute;
+  inset: -20%;
+  background:
+    radial-gradient(ellipse 50% 40% at 20% 30%, rgba(11, 110, 79, 0.22), transparent 60%),
+    radial-gradient(ellipse 45% 35% at 80% 20%, rgba(26, 155, 111, 0.14), transparent 55%),
+    radial-gradient(ellipse 40% 45% at 60% 80%, rgba(14, 26, 22, 0.08), transparent 50%);
+  animation: nx-mesh-shift 18s ease-in-out infinite alternate;
+}
+
+.nx-atmosphere__orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(40px);
+  opacity: 0.55;
+}
+
+.nx-atmosphere__orb--a {
+  width: min(52vw, 460px);
+  height: min(52vw, 460px);
+  top: -8%;
+  left: -6%;
+  background: radial-gradient(circle, rgba(11, 110, 79, 0.42), transparent 70%);
+  animation: nx-orb-drift 22s ease-in-out infinite alternate;
+}
+
+.nx-atmosphere__orb--b {
+  width: min(44vw, 400px);
+  height: min(44vw, 400px);
+  bottom: 5%;
+  right: -8%;
+  background: radial-gradient(circle, rgba(26, 155, 111, 0.28), transparent 70%);
+  animation: nx-orb-drift 26s ease-in-out infinite alternate-reverse;
+}
+
+.nx-atmosphere__sweep {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.2) 48%,
+    transparent 62%
+  );
+  background-size: 220% 100%;
+  animation: nx-light-sweep 14s ease-in-out infinite;
+  mix-blend-mode: soft-light;
+}
+
+@keyframes nx-mesh-shift {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(-3%, 2%) scale(1.04); }
+}
+
+@keyframes nx-orb-drift {
+  from { transform: translate(0, 0); }
+  to { transform: translate(6%, 8%); }
+}
+
+@keyframes nx-light-sweep {
+  0%, 100% { background-position: 120% 0; opacity: 0.35; }
+  45%, 55% { background-position: -20% 0; opacity: 0.55; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nx-atmosphere__mesh,
+  .nx-atmosphere__orb,
+  .nx-atmosphere__sweep,
+  .nx-rise,
+  .nx-wait-dot {
+    animation: none !important;
+  }
+}
+
+/* Touch-friendly tap targets */
+.nx-tap {
+  min-height: 44px;
+  min-width: 44px;
 }
 
 /* Counter / kiosk display */

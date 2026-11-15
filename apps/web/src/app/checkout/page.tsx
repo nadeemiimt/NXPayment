@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
+import { NxAtmosphere } from "@/components/nx-atmosphere";
+import { NxLogo } from "@/components/nx-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -68,55 +70,66 @@ export default function CheckoutStartPage() {
   }
 
   return (
-    <main className="min-h-screen">
-      <SiteHeader />
-      <div className="mx-auto max-w-lg px-5 pb-16 pt-4">
-        <p className="text-sm uppercase tracking-[0.2em] text-[var(--nx-accent)]">
-          SimpleCheckout
-        </p>
-        <h1 className="font-display mt-2 text-4xl font-semibold text-[var(--nx-ink)]">
-          Pay {config?.displayName ?? "merchant"}
-        </h1>
-        <p className="mt-2 text-[var(--nx-muted)]">
-          Funds go directly to{" "}
-          <span className="font-medium text-[var(--nx-ink)]">
-            {config?.primaryVpa ?? "merchant VPA"}
-          </span>
-          . NXPayment never holds the money.
-        </p>
+    <main className="relative min-h-screen overflow-x-hidden">
+      <NxAtmosphere />
+      <div className="relative z-10">
+        <SiteHeader />
+        <div className="mx-auto max-w-lg px-4 pb-16 pt-2 sm:px-5 sm:pt-4">
+          <div className="nx-rise mb-5 flex items-center gap-3">
+            <NxLogo size={40} />
+            <div>
+              <p className="text-xs font-medium uppercase tracking-[0.2em] text-[var(--nx-accent)] sm:text-sm">
+                NXPayment · SimpleCheckout
+              </p>
+              <h1 className="font-display mt-1 text-3xl font-semibold leading-tight text-[var(--nx-ink)] sm:text-4xl">
+                Pay {config?.displayName ?? "merchant"}
+              </h1>
+            </div>
+          </div>
+          <p className="nx-rise text-[var(--nx-muted)]" style={{ animationDelay: "60ms" }}>
+            Funds go directly to{" "}
+            <span className="break-all font-medium text-[var(--nx-ink)]">
+              {config?.primaryVpa ?? "merchant VPA"}
+            </span>
+            . NXPayment never holds the money.
+          </p>
 
-        <div className="mt-8 space-y-4">
-          <label className="block text-sm font-medium">
-            Amount (₹)
-            <Input
-              className="mt-1.5"
-              inputMode="decimal"
-              value={rupees}
-              onChange={(e) => setRupees(e.target.value)}
-            />
-          </label>
-          <label className="block text-sm font-medium">
-            Order reference (optional)
-            <Input
-              className="mt-1.5"
-              value={orderId}
-              onChange={(e) => setOrderId(e.target.value)}
-              placeholder="ORD-1042"
-            />
-          </label>
-          <label className="block text-sm font-medium">
-            Note (optional)
-            <Input
-              className="mt-1.5"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Table 4"
-            />
-          </label>
-          {error && <p className="text-sm text-[#9B2C2C]">{error}</p>}
-          <Button className="w-full" size="lg" disabled={loading} onClick={() => create(false)}>
-            {loading ? "Creating…" : "Continue to UPI"}
-          </Button>
+          <div
+            className="nx-rise mt-8 space-y-4"
+            style={{ animationDelay: "120ms" }}
+          >
+            <label className="block text-sm font-medium">
+              Amount (₹)
+              <Input
+                className="mt-1.5 h-12 text-base"
+                inputMode="decimal"
+                value={rupees}
+                onChange={(e) => setRupees(e.target.value)}
+              />
+            </label>
+            <label className="block text-sm font-medium">
+              Order reference (optional)
+              <Input
+                className="mt-1.5 h-12 text-base"
+                value={orderId}
+                onChange={(e) => setOrderId(e.target.value)}
+                placeholder="ORD-1042"
+              />
+            </label>
+            <label className="block text-sm font-medium">
+              Note (optional)
+              <Input
+                className="mt-1.5 h-12 text-base"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Table 4"
+              />
+            </label>
+            {error && <p className="text-sm text-[#9B2C2C]">{error}</p>}
+            <Button className="w-full" size="lg" disabled={loading} onClick={() => create(false)}>
+              {loading ? "Creating…" : "Continue to UPI"}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -134,7 +147,7 @@ export default function CheckoutStartPage() {
               Existing: {existing[0].id.slice(0, 8)}… · {existing[0].status}
             </p>
           )}
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <Button variant="outline" className="flex-1" onClick={() => setDupOpen(false)}>
               Cancel
             </Button>
