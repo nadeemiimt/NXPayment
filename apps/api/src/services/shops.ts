@@ -1,7 +1,12 @@
 import { nanoid } from "nanoid";
 import { getDb } from "../db/schema.js";
 
-export type BusinessType = "retail" | "restaurant" | "pharmacy";
+export type BusinessType =
+  | "retail"
+  | "restaurant"
+  | "pharmacy"
+  | "mall_kiosk"
+  | "supermarket";
 
 export interface ShopDto {
   id: string;

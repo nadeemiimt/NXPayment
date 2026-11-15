@@ -9,8 +9,16 @@ export type PaymentStatus =
   | "EXPIRED"
   | "CANCELLED";
 
-export type BusinessType = "retail" | "restaurant" | "pharmacy";
+export type BusinessType =
+  | "retail"
+  | "restaurant"
+  | "pharmacy"
+  | "mall_kiosk"
+  | "supermarket";
 export type StorageMode = "local_only" | "local_replica" | "hybrid" | "online_primary";
+export type SaleMode = "unit" | "weight";
+export type WeightUnit = "kg" | "g" | "L" | "ml";
+export type StaffRole = "owner" | "cashier";
 
 export interface Payment {
   id: string;
@@ -96,16 +104,28 @@ export interface InventoryItem {
   name: string;
   sku: string | null;
   qty: number;
+  qtyDisplay: number | null;
   unitPricePaise: number | null;
   bulkQty: number | null;
   bulkCostPaise: number | null;
   packSize: string | null;
   batchNo: string | null;
   expiryDate: string | null;
+  saleMode: SaleMode;
+  weightUnit: WeightUnit | null;
   pricing: PricingBreakdown | null;
   projectedProfit: ProjectedProfit | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface InventoryPage {
+  items: InventoryItem[];
+  shopId: string;
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
 }
 
 export interface StorageSettings {
@@ -117,10 +137,57 @@ export interface StorageSettings {
   primaryPath: string;
   primaryExists: boolean;
   primarySizeBytes: number | null;
+  secondaryExists?: boolean;
+  secondarySizeBytes?: number | null;
   lastBackupAt: string | null;
   lastBackupError: string | null;
+  backupIntervalMs?: number;
   updatedAt: string;
   sliceNote: string | null;
+  conflictPolicy?: string;
+}
+
+export interface StaffSettings {
+  role: StaffRole;
+  updatedAt: string;
+  canEditStorageSecrets: boolean;
+  canManageShops: boolean;
+  canSellAndConfirm: boolean;
+}
+
+export interface LoyaltyRules {
+  pointsPerRupee: number;
+  paisePerPointRedeem: number;
+  silverThresholdPaise: number;
+  goldThresholdPaise: number;
+  stampVisitsRequired: number;
+  stampRewardPaise: number;
+  updatedAt: string;
+}
+
+export interface LoyaltyCustomer {
+  id: string;
+  phone: string;
+  name: string | null;
+  points: number;
+  lifetimeSpendPaise: number;
+  visitCount: number;
+  lastPurchaseAt: string | null;
+  tier: string;
+  stamp: { visits: number; required: number; rewardReady: boolean };
+  daysSinceLastPurchase: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LoyaltyNudge {
+  id: string;
+  kind: string;
+  title: string;
+  reason: string;
+  customerId: string;
+  phone: string;
+  encourageAction: { type: string; message: string };
 }
 
 export interface GstSettings {
@@ -328,10 +395,20 @@ export const api = {
   deleteLocation: (id: string) =>
     request<{ ok: boolean }>(`/api/merchant/locations/${id}`, { method: "DELETE" }),
 
-  listInventory: (shopId?: string) =>
-    request<{ items: InventoryItem[]; shopId: string }>(
-      `/api/merchant/inventory${shopId ? `?shopId=${encodeURIComponent(shopId)}` : ""}`
-    ),
+  listInventory: (opts?: {
+    shopId?: string;
+    page?: number;
+    pageSize?: number;
+    q?: string;
+  }) => {
+    const params = new URLSearchParams();
+    if (opts?.shopId) params.set("shopId", opts.shopId);
+    if (opts?.page) params.set("page", String(opts.page));
+    if (opts?.pageSize) params.set("pageSize", String(opts.pageSize));
+    if (opts?.q) params.set("q", opts.q);
+    const qs = params.toString();
+    return request<InventoryPage>(`/api/merchant/inventory${qs ? `?${qs}` : ""}`);
+  },
   createInventory: (body: Record<string, unknown>) =>
     request<{ item: InventoryItem }>("/api/merchant/inventory", {
       method: "POST",
@@ -349,9 +426,65 @@ export const api = {
     bulkCostPaise: number;
     unitPricePaise: number;
     sellQty?: number;
+    saleMode?: SaleMode;
   }) =>
     request<{ pricing: PricingBreakdown; projectedProfit: ProjectedProfit }>(
       "/api/merchant/inventory/preview-pricing",
+      { method: "POST", body: JSON.stringify(body) }
+    ),
+  quickSale: (
+    id: string,
+    body: {
+      qty?: number;
+      weightDisplay?: number;
+      confirmDuplicate?: boolean;
+      note?: string;
+      customerId?: string;
+      pointsToRedeem?: number;
+    }
+  ) =>
+    request<{
+      payment: Payment;
+      line: { label: string; amountPaise: number; saleMode: string };
+      item: InventoryItem;
+      loyalty: unknown;
+    }>(`/api/merchant/inventory/${id}/quick-sale`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  getStaff: () => request<{ staff: StaffSettings }>("/api/merchant/staff"),
+  setStaff: (role: StaffRole) =>
+    request<{ staff: StaffSettings }>("/api/merchant/staff", {
+      method: "PUT",
+      body: JSON.stringify({ role }),
+    }),
+  getLoyaltyRules: () => request<{ rules: LoyaltyRules }>("/api/merchant/loyalty/rules"),
+  updateLoyaltyRules: (body: Partial<LoyaltyRules>) =>
+    request<{ rules: LoyaltyRules }>("/api/merchant/loyalty/rules", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  listLoyaltyCustomers: (q?: string) =>
+    request<{ customers: LoyaltyCustomer[] }>(
+      `/api/merchant/loyalty/customers${q ? `?q=${encodeURIComponent(q)}` : ""}`
+    ),
+  enrollLoyaltyCustomer: (body: { phone: string; name?: string | null }) =>
+    request<{ customer: LoyaltyCustomer }>("/api/merchant/loyalty/customers", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  lookupLoyaltyByPhone: (phone: string) =>
+    request<{ customer: LoyaltyCustomer; rules: LoyaltyRules }>(
+      `/api/merchant/loyalty/customers/by-phone/${encodeURIComponent(phone)}`
+    ),
+  loyaltyNudges: () => request<{ nudges: LoyaltyNudge[] }>("/api/merchant/loyalty/nudges"),
+  loyaltyEncourage: (body: {
+    customerId: string;
+    channel: "note" | "whatsapp_stub";
+    message: string;
+  }) =>
+    request<{ ok: boolean; stub?: boolean; message: string; note: string }>(
+      "/api/merchant/loyalty/encourage",
       { method: "POST", body: JSON.stringify(body) }
     ),
 

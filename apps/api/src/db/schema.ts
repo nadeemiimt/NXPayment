@@ -150,12 +150,75 @@ function migrate(database: Db) {
       pack_size TEXT,
       batch_no TEXT,
       expiry_date TEXT,
+      sale_mode TEXT NOT NULL DEFAULT 'unit',
+      weight_unit TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       deleted_at TEXT,
       FOREIGN KEY (shop_id) REFERENCES shops(id),
       FOREIGN KEY (location_id) REFERENCES locations(id)
     );
+
+    CREATE TABLE IF NOT EXISTS sale_lines (
+      id TEXT PRIMARY KEY,
+      payment_id TEXT NOT NULL,
+      inventory_item_id TEXT,
+      label TEXT NOT NULL,
+      sale_mode TEXT NOT NULL DEFAULT 'unit',
+      qty REAL NOT NULL,
+      weight_unit TEXT,
+      rate_paise INTEGER NOT NULL,
+      amount_paise INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (payment_id) REFERENCES payments(id),
+      FOREIGN KEY (inventory_item_id) REFERENCES inventory_items(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS staff_settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      role TEXT NOT NULL DEFAULT 'owner',
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS loyalty_rules (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      points_per_rupee REAL NOT NULL DEFAULT 1,
+      paise_per_point_redeem INTEGER NOT NULL DEFAULT 100,
+      silver_threshold_paise INTEGER NOT NULL DEFAULT 5000000,
+      gold_threshold_paise INTEGER NOT NULL DEFAULT 20000000,
+      stamp_visits_required INTEGER NOT NULL DEFAULT 10,
+      stamp_reward_paise INTEGER NOT NULL DEFAULT 5000,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS loyalty_customers (
+      id TEXT PRIMARY KEY,
+      phone TEXT NOT NULL UNIQUE,
+      name TEXT,
+      points INTEGER NOT NULL DEFAULT 0,
+      lifetime_spend_paise INTEGER NOT NULL DEFAULT 0,
+      visit_count INTEGER NOT NULL DEFAULT 0,
+      last_purchase_at TEXT,
+      tier TEXT NOT NULL DEFAULT 'none',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      deleted_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS loyalty_ledger (
+      id TEXT PRIMARY KEY,
+      customer_id TEXT NOT NULL,
+      payment_id TEXT,
+      kind TEXT NOT NULL,
+      points_delta INTEGER NOT NULL,
+      amount_paise INTEGER,
+      note TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (customer_id) REFERENCES loyalty_customers(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_loyalty_customers_phone ON loyalty_customers(phone);
+    CREATE INDEX IF NOT EXISTS idx_loyalty_ledger_customer ON loyalty_ledger(customer_id);
 
     CREATE INDEX IF NOT EXISTS idx_inventory_shop ON inventory_items(shop_id);
     CREATE INDEX IF NOT EXISTS idx_locations_shop ON locations(shop_id);
@@ -202,6 +265,14 @@ function migrate(database: Db) {
   }
   if (!hasColumn(database, "inventory_items", "expiry_date")) {
     database.exec(`ALTER TABLE inventory_items ADD COLUMN expiry_date TEXT`);
+  }
+  if (!hasColumn(database, "inventory_items", "sale_mode")) {
+    database.exec(
+      `ALTER TABLE inventory_items ADD COLUMN sale_mode TEXT NOT NULL DEFAULT 'unit'`
+    );
+  }
+  if (!hasColumn(database, "inventory_items", "weight_unit")) {
+    database.exec(`ALTER TABLE inventory_items ADD COLUMN weight_unit TEXT`);
   }
   if (!hasColumn(database, "payments", "shop_id")) {
     database.exec(`ALTER TABLE payments ADD COLUMN shop_id TEXT`);
@@ -285,6 +356,27 @@ function migrate(database: Db) {
       .run(now);
   }
 
+  const staff = database.prepare("SELECT id FROM staff_settings WHERE id = 1").get();
+  if (!staff) {
+    database
+      .prepare(
+        `INSERT INTO staff_settings (id, role, updated_at) VALUES (1, 'owner', ?)`
+      )
+      .run(now);
+  }
+
+  const loyalty = database.prepare("SELECT id FROM loyalty_rules WHERE id = 1").get();
+  if (!loyalty) {
+    database
+      .prepare(
+        `INSERT INTO loyalty_rules (
+          id, points_per_rupee, paise_per_point_redeem, silver_threshold_paise,
+          gold_threshold_paise, stamp_visits_required, stamp_reward_paise, updated_at
+        ) VALUES (1, 1, 100, 5000000, 20000000, 10, 5000, ?)`
+      )
+      .run(now);
+  }
+
   // Ensure at least one default shop for multi-shop UX
   const shopCount = database.prepare("SELECT COUNT(*) as c FROM shops WHERE deleted_at IS NULL").get() as {
     c: number;
@@ -301,7 +393,7 @@ function migrate(database: Db) {
 
   database
     .prepare(
-      `INSERT INTO app_meta (key, value) VALUES ('schema_version', '2')
+      `INSERT INTO app_meta (key, value) VALUES ('schema_version', '3')
        ON CONFLICT(key) DO UPDATE SET value = excluded.value`
     )
     .run();

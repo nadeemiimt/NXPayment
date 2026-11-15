@@ -71,8 +71,9 @@ describe("Slice 1 integration", () => {
       onlineConnectionString: "postgres://user:pass@localhost:5432/nxp",
     });
     assert.equal(online.onlineConnectionConfigured, true);
-    assert.equal(online.onlinePrimaryStatus, "stub_coming_slice2");
+    assert.equal(online.onlinePrimaryStatus, "configured_sqlite_primary");
     assert.ok(online.sliceNote);
+    assert.ok(online.conflictPolicy);
 
     // Clear secret from response path — status must not leak plaintext
     const status = getStorageSettings();
@@ -107,12 +108,12 @@ describe("Slice 1 integration", () => {
       bulkCostPaise: 25000,
       locationId: shelf.id,
     });
-    assert.equal(listInventory(cafe.id).length, 1);
+    assert.equal(listInventory(cafe.id).items.length, 1);
     assert.equal(item.locationName, "Front shelf");
     assert.ok(item.pricing);
     assert.equal(item.pricing!.costPerUnitPaise, 2500);
     deleteInventoryItem(item.id);
-    assert.equal(listInventory(cafe.id).length, 0);
+    assert.equal(listInventory(cafe.id).items.length, 0);
 
     const pharmacy = createShop({ name: "Local Chemist", businessType: "pharmacy" });
     assert.equal(pharmacy.businessType, "pharmacy");

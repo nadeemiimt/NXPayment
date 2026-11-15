@@ -23,10 +23,15 @@ export default function ReportsPage() {
   const [rate, setRate] = useState("18");
   const [splitMode, setSplitMode] = useState<"cgst_sgst" | "igst">("cgst_sgst");
   const [priceMode, setPriceMode] = useState<"inclusive" | "exclusive">("inclusive");
+  const [scope, setScope] = useState<"active" | "all">("active");
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const r = await api.reports({ period, date });
+    const r = await api.reports({
+      period,
+      date,
+      shopId: scope === "all" ? "all" : undefined,
+    });
     setTotals(r.totals);
     setByDow(r.charts.byDayOfWeek);
     setByHour(r.charts.byHour);
@@ -35,7 +40,7 @@ export default function ReportsPage() {
     setRate(String(r.gst.ratePercent));
     setSplitMode(r.gst.splitMode);
     setPriceMode(r.gst.priceMode);
-  }, [period, date]);
+  }, [period, date, scope]);
 
   useEffect(() => {
     load().catch((e) => setError(e.message));
@@ -48,12 +53,28 @@ export default function ReportsPage() {
     <div>
       <h1 className="font-display text-3xl font-semibold">Reports</h1>
       <p className="mt-2 max-w-2xl text-[var(--nx-muted)]">
-        Daily / monthly / India FY (Apr–Mar) aggregates with GST snapshot from settled payments.
-        Scoped to the active shop.
+        Daily / monthly / India FY (Apr–Mar) aggregates with GST snapshot. Filter one shop or org
+        roll-up across all outlets.
       </p>
       {error && <p className="mt-3 text-sm text-[#9B2C2C]">{error}</p>}
 
       <div className="mt-6 flex flex-wrap gap-3">
+        <Button
+          type="button"
+          size="sm"
+          variant={scope === "active" ? "default" : "outline"}
+          onClick={() => setScope("active")}
+        >
+          Active shop
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={scope === "all" ? "default" : "outline"}
+          onClick={() => setScope("all")}
+        >
+          All shops (org)
+        </Button>
         {(["daily", "monthly", "financial_year"] as const).map((p) => (
           <Button
             key={p}
@@ -72,7 +93,14 @@ export default function ReportsPage() {
           onChange={(e) => setDate(e.target.value)}
         />
         <Button asChild size="sm" variant="secondary">
-          <a href={api.reportsCsvUrl({ period, date })} download>
+          <a
+            href={api.reportsCsvUrl({
+              period,
+              date,
+              shopId: scope === "all" ? "all" : undefined,
+            })}
+            download
+          >
             CSV export
           </a>
         </Button>

@@ -148,6 +148,11 @@ export default function StoragePage() {
       {storage?.sliceNote && (
         <p className="mt-4 max-w-2xl text-sm text-[var(--nx-muted)]">{storage.sliceNote}</p>
       )}
+      {storage?.conflictPolicy && (
+        <p className="mt-3 max-w-2xl text-xs text-[var(--nx-muted)]">
+          Conflict policy: {storage.conflictPolicy}
+        </p>
+      )}
     </div>
   );
 }

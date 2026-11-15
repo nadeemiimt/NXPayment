@@ -6,9 +6,37 @@ import {
   type BusinessType,
   type Location,
   type Shop,
+  type StaffRole,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
+function StaffRoleStub() {
+  const [role, setRole] = useState<StaffRole>("owner");
+  useEffect(() => {
+    api.getStaff().then((r) => setRole(r.staff.role)).catch(() => undefined);
+  }, []);
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+      <span className="text-[var(--nx-muted)]">Staff role stub</span>
+      <select
+        className="h-9 rounded-md border border-[var(--nx-line)] bg-white/80 px-2"
+        value={role}
+        onChange={async (e) => {
+          const next = e.target.value as StaffRole;
+          const r = await api.setStaff(next);
+          setRole(r.staff.role);
+        }}
+      >
+        <option value="owner">Owner</option>
+        <option value="cashier">Cashier</option>
+      </select>
+      <span className="text-xs text-[var(--nx-muted)]">
+        Cashier can sell/confirm; cannot edit storage secrets or manage shops.
+      </span>
+    </div>
+  );
+}
 
 export default function ShopsPage() {
   const [shops, setShops] = useState<Shop[]>([]);
@@ -41,10 +69,12 @@ export default function ShopsPage() {
     <div>
       <h1 className="font-display text-3xl font-semibold">Shops & locations</h1>
       <p className="mt-2 max-w-2xl text-[var(--nx-muted)]">
-        Multi-outlet install. Optional per-shop VPA override stub (falls back to merchant primary).
-        Pharmacy type unlocks batch/expiry fields on inventory.
+        Multi-outlet / mall install. Optional per-shop VPA override stub. Pharmacy unlocks
+        batch/expiry; mall_kiosk and supermarket supported for retail chains.
       </p>
       {error && <p className="mt-3 text-sm text-[#9B2C2C]">{error}</p>}
+
+      <StaffRoleStub />
 
       <form
         className="mt-8 grid max-w-2xl gap-3 sm:grid-cols-2"
@@ -79,6 +109,8 @@ export default function ShopsPage() {
           <option value="retail">Retail</option>
           <option value="restaurant">Restaurant / café</option>
           <option value="pharmacy">Pharmacy</option>
+          <option value="mall_kiosk">Mall kiosk</option>
+          <option value="supermarket">Supermarket</option>
         </select>
         <Input
           className="sm:col-span-2"
