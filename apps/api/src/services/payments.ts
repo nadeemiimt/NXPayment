@@ -8,9 +8,10 @@ import {
 import { config } from "../config.js";
 import { getDb } from "../db/schema.js";
 import { computeGst } from "../lib/money-gst.js";
-import { upiDirectRail } from "../rails/upi-direct.js";
+import { ProviderNotConfiguredError } from "../rails/registry.js";
 import { getGstSettings } from "./gst-settings.js";
 import { resolveReceivingVpa } from "./merchant.js";
+import { pickCheckoutProvider } from "./providers.js";
 import { dispatchTerminalWebhook } from "./webhooks.js";
 
 interface PaymentRow {
@@ -38,6 +39,7 @@ interface PaymentRow {
   gst_rate_percent?: number | null;
   gst_split_mode?: string | null;
   gst_price_mode?: string | null;
+  provider_id?: string | null;
 }
 
 function toDto(row: PaymentRow): PaymentDto {
@@ -56,6 +58,7 @@ function toDto(row: PaymentRow): PaymentDto {
     updatedAt: row.updated_at,
     expiresAt: row.expires_at,
     confirmedAt: row.confirmed_at,
+    providerId: row.provider_id ?? "upi_direct",
   };
 }
 
@@ -92,6 +95,8 @@ export async function createPayment(input: {
   idempotencyKey?: string;
   confirmDuplicate?: boolean;
   shopId?: string | null;
+  /** Optional override — normally selected via provider registry. */
+  providerId?: string | null;
 }): Promise<PaymentDto> {
   if (!Number.isInteger(input.amountPaise) || input.amountPaise <= 0) {
     throw new Error("amountPaise must be a positive integer");
@@ -114,7 +119,8 @@ export async function createPayment(input: {
   const now = new Date();
   const expiresAt = new Date(now.getTime() + config.paymentTtlMs);
 
-  const checkout = await upiDirectRail.createCheckout({
+  const { provider: chosen } = await pickCheckoutProvider();
+  const checkout = await chosen.createPayment({
     id,
     amountPaise: input.amountPaise,
     note: input.note,
@@ -122,16 +128,25 @@ export async function createPayment(input: {
     receivingName: receiving.name,
   });
 
+  if (checkout.notConfigured || !checkout.upiUri) {
+    throw new ProviderNotConfiguredError(
+      chosen.id,
+      checkout.message ?? `${chosen.id} is not configured`
+    );
+  }
+
   getDb()
     .prepare(
       `INSERT INTO payments (
         id, merchant_order_id, amount_paise, currency, status, note,
         receiving_vpa, receiving_name, upi_uri, idempotency_key, confirm_duplicate,
-        created_at, updated_at, expires_at, confirmed_at, failure_reason, shop_id
+        created_at, updated_at, expires_at, confirmed_at, failure_reason, shop_id,
+        provider_id
       ) VALUES (
         @id, @merchant_order_id, @amount_paise, 'INR', 'ACTIVE', @note,
         @receiving_vpa, @receiving_name, @upi_uri, @idempotency_key, @confirm_duplicate,
-        @created_at, @updated_at, @expires_at, NULL, NULL, @shop_id
+        @created_at, @updated_at, @expires_at, NULL, NULL, @shop_id,
+        @provider_id
       )`
     )
     .run({
@@ -148,9 +163,14 @@ export async function createPayment(input: {
       updated_at: now.toISOString(),
       expires_at: expiresAt.toISOString(),
       shop_id: receiving.shopId,
+      provider_id: checkout.provider ?? chosen.id,
     });
 
-  audit(id, "created", `amount=${input.amountPaise};shop=${receiving.shopId ?? ""}`);
+  audit(
+    id,
+    "created",
+    `amount=${input.amountPaise};shop=${receiving.shopId ?? ""};provider=${chosen.id}`
+  );
   return getPayment(id)!;
 }
 

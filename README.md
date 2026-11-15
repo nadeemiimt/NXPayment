@@ -170,7 +170,29 @@ Node **20+** required (`scripts/require-node20.js`).
 cd apps/api && npm test
 ```
 
-Covers GST math, bulk/retail profit math, storage config, report aggregates, display session happy path, confirm scorer, margin guard, loyalty offers.
+Covers GST math, bulk/retail profit math, storage config, report aggregates, display session happy path, confirm scorer, margin guard, loyalty offers, provider registry selection, agent create/status.
+
+## Agent shopping
+
+Machine-readable commerce for shopping agents (no browser). **Default rail is still direct UPI** — no licensed PA on the primary path.
+
+1. In **Setup** (`/merchant/onboarding`): turn on **Allow shopping agents** → **Create API key** → copy once.  
+2. OpenAPI: `GET /api/agent/v1/openapi.json`  
+3. Call with `Authorization: Bearer <apiKey>`:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/agent/v1/catalog` | List inventory |
+| `POST` | `/api/agent/v1/quote` | Quote cart `{ lines: [{ itemId, qty }] }` |
+| `POST` | `/api/agent/v1/payments` | Create pay (`amountPaise` or `lines`) → `upiUri`, `qrPayload`, `deepLinks`, `provider` |
+| `GET` | `/api/agent/v1/payments/:id` | Status |
+| `POST` | `/api/agent/v1/payments/:id/confirm` | Optional confirm |
+
+Keys are **hashed at rest**; plaintext is never committed. Turn agents off anytime in Setup.
+
+### Providers (simple)
+
+Registry in `apps/api` (`upi_direct` default; `card_partner_visa` / `card_partner_mastercard` / `authorize_net` stubs return **not configured**). Merchant UI: UPI on, Cards coming soon, Other under **Advanced**. No new nav items.
 
 ## API sketch
 
@@ -188,9 +210,11 @@ Covers GST math, bulk/retail profit math, storage config, report aggregates, dis
 - `GET /api/display/:code` — kiosk state  
 - `GET /api/merchant/insights`  
 - `GET/PUT /api/merchant/receipt-settings` · `GET …/payments/:id/receipt` · `…/receipt.escpos`  
+- `GET/PUT /api/merchant/providers` · `GET/POST /api/merchant/agents…`  
+- `/api/agent/v1/…` — agent commerce (see above)  
 - Shops / locations / inventory CRUD under `/api/merchant/…`  
 - `POST /api/reports/reconciliation` — **stub**  
-- Card rails `visa_partner` / `mastercard_partner` — **stubs only**
+- Card / Authorize.net providers — **stubs only** (`not configured`)
 
 Amounts are integer **paise**. Outbound webhooks are HMAC-SHA256 signed with `WEBHOOK_SECRET` (`X-NXPayment-Signature`).
 

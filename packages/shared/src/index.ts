@@ -75,6 +75,8 @@ export interface PaymentDto {
   updatedAt: string;
   expiresAt: string;
   confirmedAt: string | null;
+  /** Payment provider / rail id (default upi_direct). */
+  providerId?: string;
 }
 
 export interface TallyReport {
