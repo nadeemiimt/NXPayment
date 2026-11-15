@@ -66,8 +66,48 @@ export interface Shop {
   businessType: BusinessType;
   vpaOverride: string | null;
   isActive: boolean;
+  minMarginPercent: number;
+  underMarginMode: "warn" | "block";
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ConfirmAssist {
+  paymentId: string;
+  creditId: string | null;
+  score: number;
+  confidence: "high" | "medium" | "low" | "none";
+  reasons: string[];
+  sameAmountCollision: boolean;
+  sameAmountCount: number;
+  recommendConfirm: boolean;
+}
+
+export interface PendingAssistRow {
+  payment: Payment;
+  assist: ConfirmAssist;
+}
+
+export interface MarginCheck {
+  action: "allow" | "warn" | "block";
+  sellPaise: number;
+  costPaise: number;
+  profitPaise: number;
+  marginPercent: number | null;
+  belowCost: boolean;
+  underMinMargin: boolean;
+  message: string | null;
+}
+
+export interface NextBestOffer {
+  id: string;
+  customerId: string;
+  kind: "discount_paise" | "points_bonus";
+  discountPaise: number;
+  pointsBonus: number;
+  title: string;
+  reason: string;
+  source: "heuristic";
 }
 
 export interface Location {
@@ -317,8 +357,31 @@ export const api = {
       `/api/payments${status ? `?status=${status}` : ""}`
     ),
   pending: () => request<{ payments: Payment[] }>("/api/payments/pending"),
-  confirm: (id: string) =>
-    request<{ payment: Payment }>(`/api/payments/${id}/confirm`, { method: "POST" }),
+  pendingAssist: () =>
+    request<{
+      payments: PendingAssistRow[];
+      llmUsed: boolean;
+      note: string;
+    }>("/api/payments/pending/assist"),
+  recordObservedCredit: (body: {
+    amountPaise: number;
+    observedAt?: string;
+    utr?: string | null;
+    source?: string | null;
+    note?: string | null;
+  }) =>
+    request<{
+      credit: { id: string; amountPaise: number; observedAt: string; utr: string | null };
+      assist: { payments: PendingAssistRow[]; note: string };
+    }>("/api/payments/observed-credits", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  confirm: (id: string, body?: { creditId?: string }) =>
+    request<{ payment: Payment }>(`/api/payments/${id}/confirm`, {
+      method: "POST",
+      body: JSON.stringify(body ?? {}),
+    }),
   reject: (id: string, reason?: string) =>
     request<{ payment: Payment }>(`/api/payments/${id}/reject`, {
       method: "POST",
@@ -362,6 +425,8 @@ export const api = {
     name: string;
     businessType?: BusinessType;
     vpaOverride?: string | null;
+    minMarginPercent?: number;
+    underMarginMode?: "warn" | "block";
   }) =>
     request<{ shop: Shop }>("/api/merchant/shops", {
       method: "POST",
@@ -369,7 +434,13 @@ export const api = {
     }),
   updateShop: (
     id: string,
-    body: { name?: string; businessType?: BusinessType; vpaOverride?: string | null }
+    body: {
+      name?: string;
+      businessType?: BusinessType;
+      vpaOverride?: string | null;
+      minMarginPercent?: number;
+      underMarginMode?: "warn" | "block";
+    }
   ) =>
     request<{ shop: Shop }>(`/api/merchant/shops/${id}`, {
       method: "PUT",
@@ -441,6 +512,7 @@ export const api = {
       note?: string;
       customerId?: string;
       pointsToRedeem?: number;
+      acceptMarginWarning?: boolean;
     }
   ) =>
     request<{
@@ -448,6 +520,7 @@ export const api = {
       line: { label: string; amountPaise: number; saleMode: string };
       item: InventoryItem;
       loyalty: unknown;
+      margin: MarginCheck;
     }>(`/api/merchant/inventory/${id}/quick-sale`, {
       method: "POST",
       body: JSON.stringify(body),
@@ -474,9 +547,40 @@ export const api = {
       body: JSON.stringify(body),
     }),
   lookupLoyaltyByPhone: (phone: string) =>
-    request<{ customer: LoyaltyCustomer; rules: LoyaltyRules }>(
-      `/api/merchant/loyalty/customers/by-phone/${encodeURIComponent(phone)}`
+    request<{
+      customer: LoyaltyCustomer;
+      rules: LoyaltyRules;
+      nextBestOffer: NextBestOffer | null;
+    }>(`/api/merchant/loyalty/customers/by-phone/${encodeURIComponent(phone)}`),
+  getNextBestOffer: (customerId: string) =>
+    request<{ offer: NextBestOffer }>(
+      `/api/merchant/loyalty/customers/${customerId}/next-offer`
     ),
+  acceptLoyaltyOffer: (
+    customerId: string,
+    body: {
+      offerId: string;
+      kind: "discount_paise" | "points_bonus";
+      discountPaise?: number;
+      pointsBonus?: number;
+      paymentId?: string;
+      amountPaise?: number;
+    }
+  ) =>
+    request<{
+      result: {
+        customer: LoyaltyCustomer;
+        offer: NextBestOffer;
+        applied: {
+          pointsAdded: number;
+          discountPaise: number;
+          payablePaise: number | null;
+        };
+      };
+    }>(`/api/merchant/loyalty/customers/${customerId}/accept-offer`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
   loyaltyNudges: () => request<{ nudges: LoyaltyNudge[] }>("/api/merchant/loyalty/nudges"),
   loyaltyEncourage: (body: {
     customerId: string;

@@ -60,6 +60,35 @@ docker compose -f deploy/docker-compose.yml up --build
 - API: port `3847`  
 - Web: port `4321`
 
+## Local shop SaaS (Slice 3 — AI + payment)
+
+Stacked on Slice 2. Heuristic assist only unless `INSIGHTS_LLM_KEY` + `INSIGHTS_LLM_URL` are set (never fake LLM).
+
+### Smart confirm assist
+
+- `GET /api/payments/pending/assist` scores open payments vs observed bank credits (amount, time window, UTR, same-amount collisions).
+- `POST /api/payments/observed-credits` logs a manual/SMS-style credit; Pending UI shows confidence + one-tap Confirm.
+- Optional LLM path shares insights keys — without a real provider call, UI stays heuristic-only.
+
+### Margin / loss guard
+
+- Shop settings: `minMarginPercent`, `underMarginMode` (`warn` | `block`) on `/merchant/shops`.
+- Quick-sale blocks sell &lt; cost; under min margin returns `409 margin_guard` (warn) or `400` (block). Inventory UI prompts to accept warn.
+- Pharmacy insights flag SKUs within 60 days of expiry.
+
+### Loyalty next-best offer
+
+- One RFM / purchase-gap offer per enrolled customer (`discount_paise` or `points_bonus`).
+- Shown on `/merchant/loyalty` and checkout phone lookup; **Accept** applies redeem (points or discount).
+
+### Tests (Slice 3)
+
+```bash
+cd apps/api && npm test
+```
+
+Adds confirm-scorer, margin math, and next-best offer generation coverage.
+
 ## Local shop SaaS (Slice 2 — malls / weight / loyalty)
 
 Stacked on Slice 1. Targets malls, pharmacies, and retail chains plus loose weight sales.
@@ -141,13 +170,16 @@ Node **20+** required (`scripts/require-node20.js`).
 cd apps/api && npm test
 ```
 
-Covers GST math, bulk/retail profit math, storage config, report aggregates, display session happy path.
+Covers GST math, bulk/retail profit math, storage config, report aggregates, display session happy path, confirm scorer, margin guard, loyalty offers.
 
 ## API sketch
 
 - `POST /api/payments` — create (`amountPaise`, optional `confirmDuplicate`, `idempotencyKey`, `shopId`)  
 - `GET /api/payments/:id` — status  
+- `GET /api/payments/pending/assist` — confirm confidence scores  
+- `POST /api/payments/observed-credits` — log bank credit for assist  
 - `POST /api/payments/:id/confirm` | `/reject`  
+- `GET/POST …/loyalty/customers/:id/next-offer` | `accept-offer`  
 - `GET /api/reports/tally` — success / failed / sales  
 - `GET /api/merchant/reports` — period totals + charts  
 - `GET /api/merchant/reports/csv` — CSV export  

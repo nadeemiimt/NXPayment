@@ -1,10 +1,12 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
+  acceptNextBestOffer,
   enrollCustomer,
   findCustomerByPhone,
   getCustomer,
   getLoyaltyRules,
+  getNextBestOffer,
   listCustomers,
   loyaltyNudges,
   recordPurchase,
@@ -65,14 +67,53 @@ export async function loyaltyRoutes(app: FastifyInstance) {
     const { phone } = req.params as { phone: string };
     const customer = findCustomerByPhone(decodeURIComponent(phone));
     if (!customer) return reply.code(404).send({ error: "not_found" });
-    return { customer, rules: getLoyaltyRules() };
+    return {
+      customer,
+      rules: getLoyaltyRules(),
+      nextBestOffer: getNextBestOffer(customer.id),
+    };
   });
 
   app.get("/api/merchant/loyalty/customers/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
     const customer = getCustomer(id);
     if (!customer) return reply.code(404).send({ error: "not_found" });
-    return { customer };
+    return { customer, nextBestOffer: getNextBestOffer(id) };
+  });
+
+  app.get("/api/merchant/loyalty/customers/:id/next-offer", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const offer = getNextBestOffer(id);
+    if (!offer) return reply.code(404).send({ error: "not_found" });
+    return { offer };
+  });
+
+  app.post("/api/merchant/loyalty/customers/:id/accept-offer", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const parsed = z
+      .object({
+        offerId: z.string().min(1),
+        kind: z.enum(["discount_paise", "points_bonus"]),
+        discountPaise: z.number().int().nonnegative().optional(),
+        pointsBonus: z.number().int().nonnegative().optional(),
+        paymentId: z.string().optional(),
+        amountPaise: z.number().int().positive().optional(),
+      })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "invalid_body", details: parsed.error.flatten() });
+    }
+    try {
+      const result = acceptNextBestOffer({
+        customerId: id,
+        ...parsed.data,
+      });
+      return { result };
+    } catch (err) {
+      return reply
+        .code(400)
+        .send({ error: "accept_failed", message: (err as Error).message });
+    }
   });
 
   app.post("/api/merchant/loyalty/customers/:id/purchase", async (req, reply) => {

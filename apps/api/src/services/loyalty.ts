@@ -9,6 +9,10 @@ import {
   type LoyaltyRules,
   type LoyaltyTier,
 } from "../lib/loyalty-math.js";
+import {
+  generateNextBestOffer,
+  type NextBestOffer,
+} from "../lib/loyalty-offers.js";
 
 export interface LoyaltyRulesDto extends LoyaltyRules {
   updatedAt: string;
@@ -389,4 +393,118 @@ export function loyaltyNudges(): LoyaltyNudge[] {
   }
 
   return out.slice(0, 20);
+}
+
+export function getNextBestOffer(customerId: string): NextBestOffer | null {
+  const customer = getCustomer(customerId);
+  if (!customer) return null;
+  return generateNextBestOffer({
+    id: customer.id,
+    points: customer.points,
+    lifetimeSpendPaise: customer.lifetimeSpendPaise,
+    visitCount: customer.visitCount,
+    daysSinceLastPurchase: customer.daysSinceLastPurchase,
+    tier: customer.tier,
+    stamp: customer.stamp,
+  });
+}
+
+/**
+ * Accept/apply a next-best offer.
+ * - points_bonus: credits points immediately (ledger)
+ * - discount_paise: with amountPaise applies as one-shot redeem; without amount stores pending via ledger note
+ */
+export function acceptNextBestOffer(opts: {
+  customerId: string;
+  offerId: string;
+  kind: "discount_paise" | "points_bonus";
+  discountPaise?: number;
+  pointsBonus?: number;
+  paymentId?: string;
+  amountPaise?: number;
+}): {
+  customer: LoyaltyCustomerDto;
+  offer: NextBestOffer;
+  applied: {
+    pointsAdded: number;
+    discountPaise: number;
+    payablePaise: number | null;
+  };
+} {
+  const customer = getCustomer(opts.customerId);
+  if (!customer) throw new Error("Customer not found");
+
+  const expected = getNextBestOffer(opts.customerId);
+  if (!expected || expected.id !== opts.offerId) {
+    throw new Error("Offer expired or mismatch — refresh next-best offer");
+  }
+
+  const now = new Date().toISOString();
+
+  if (opts.kind === "points_bonus" || expected.kind === "points_bonus") {
+    const bonus = opts.pointsBonus ?? expected.pointsBonus;
+    if (bonus <= 0) throw new Error("Invalid points bonus");
+    getDb()
+      .prepare(
+        `UPDATE loyalty_customers SET points = ?, updated_at = ? WHERE id = ?`
+      )
+      .run(customer.points + bonus, now, opts.customerId);
+    ledger(opts.customerId, "offer_bonus", bonus, {
+      paymentId: opts.paymentId,
+      note: `next-best offer ${expected.id}`,
+    });
+    return {
+      customer: getCustomer(opts.customerId)!,
+      offer: expected,
+      applied: { pointsAdded: bonus, discountPaise: 0, payablePaise: null },
+    };
+  }
+
+  const discount = opts.discountPaise ?? expected.discountPaise;
+  if (discount <= 0) throw new Error("Invalid discount");
+
+  if (opts.amountPaise != null && opts.amountPaise > 0) {
+    const appliedDiscount = Math.min(discount, opts.amountPaise);
+    ledger(opts.customerId, "offer_discount", 0, {
+      paymentId: opts.paymentId,
+      amountPaise: appliedDiscount,
+      note: `next-best offer ${expected.id}`,
+    });
+    return {
+      customer: getCustomer(opts.customerId)!,
+      offer: expected,
+      applied: {
+        pointsAdded: 0,
+        discountPaise: appliedDiscount,
+        payablePaise: opts.amountPaise - appliedDiscount,
+      },
+    };
+  }
+
+  // No basket yet — convert discount to equivalent points at current redeem rate
+  const rules = getLoyaltyRules();
+  const asPoints =
+    rules.paisePerPointRedeem > 0
+      ? Math.ceil(discount / rules.paisePerPointRedeem)
+      : 0;
+  if (asPoints > 0) {
+    getDb()
+      .prepare(
+        `UPDATE loyalty_customers SET points = ?, updated_at = ? WHERE id = ?`
+      )
+      .run(customer.points + asPoints, now, opts.customerId);
+  }
+  ledger(opts.customerId, "offer_discount", asPoints, {
+    amountPaise: discount,
+    note: `next-best offer ${expected.id} (credited as points)`,
+  });
+  return {
+    customer: getCustomer(opts.customerId)!,
+    offer: expected,
+    applied: {
+      pointsAdded: asPoints,
+      discountPaise: discount,
+      payablePaise: null,
+    },
+  };
 }

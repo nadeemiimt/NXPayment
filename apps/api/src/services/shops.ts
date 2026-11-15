@@ -14,6 +14,8 @@ export interface ShopDto {
   businessType: BusinessType;
   vpaOverride: string | null;
   isActive: boolean;
+  minMarginPercent: number;
+  underMarginMode: "warn" | "block";
   createdAt: string;
   updatedAt: string;
 }
@@ -24,6 +26,8 @@ interface ShopRow {
   business_type: string;
   vpa_override: string | null;
   is_active: number;
+  min_margin_percent?: number;
+  under_margin_mode?: string;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -36,6 +40,8 @@ function toDto(row: ShopRow): ShopDto {
     businessType: (row.business_type || "retail") as BusinessType,
     vpaOverride: row.vpa_override,
     isActive: row.is_active === 1,
+    minMarginPercent: row.min_margin_percent ?? 0,
+    underMarginMode: row.under_margin_mode === "block" ? "block" : "warn",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -70,6 +76,8 @@ export function createShop(input: {
   name: string;
   businessType?: BusinessType;
   vpaOverride?: string | null;
+  minMarginPercent?: number;
+  underMarginMode?: "warn" | "block";
 }): ShopDto {
   const id = `shop_${nanoid(10)}`;
   const now = new Date().toISOString();
@@ -77,8 +85,10 @@ export function createShop(input: {
   const makeActive = existing.length === 0;
   getDb()
     .prepare(
-      `INSERT INTO shops (id, name, business_type, vpa_override, is_active, created_at, updated_at, deleted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`
+      `INSERT INTO shops (
+        id, name, business_type, vpa_override, is_active,
+        min_margin_percent, under_margin_mode, created_at, updated_at, deleted_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`
     )
     .run(
       id,
@@ -86,6 +96,8 @@ export function createShop(input: {
       input.businessType ?? "retail",
       input.vpaOverride ?? null,
       makeActive ? 1 : 0,
+      input.minMarginPercent ?? 0,
+      input.underMarginMode ?? "warn",
       now,
       now
     );
@@ -98,6 +110,8 @@ export function updateShop(
     name?: string;
     businessType?: BusinessType;
     vpaOverride?: string | null;
+    minMarginPercent?: number;
+    underMarginMode?: "warn" | "block";
   }
 ): ShopDto {
   const current = getShop(id);
@@ -105,12 +119,15 @@ export function updateShop(
   const now = new Date().toISOString();
   getDb()
     .prepare(
-      `UPDATE shops SET name = ?, business_type = ?, vpa_override = ?, updated_at = ? WHERE id = ?`
+      `UPDATE shops SET name = ?, business_type = ?, vpa_override = ?,
+       min_margin_percent = ?, under_margin_mode = ?, updated_at = ? WHERE id = ?`
     )
     .run(
       input.name ?? current.name,
       input.businessType ?? current.businessType,
       input.vpaOverride !== undefined ? input.vpaOverride : current.vpaOverride,
+      input.minMarginPercent ?? current.minMarginPercent,
+      input.underMarginMode ?? current.underMarginMode,
       now,
       id
     );

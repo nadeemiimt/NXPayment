@@ -122,9 +122,22 @@ function migrate(database: Db) {
       business_type TEXT NOT NULL DEFAULT 'retail',
       vpa_override TEXT,
       is_active INTEGER NOT NULL DEFAULT 0,
+      min_margin_percent REAL NOT NULL DEFAULT 0,
+      under_margin_mode TEXT NOT NULL DEFAULT 'warn',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       deleted_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS observed_credits (
+      id TEXT PRIMARY KEY,
+      amount_paise INTEGER NOT NULL,
+      observed_at TEXT NOT NULL,
+      utr TEXT,
+      source TEXT,
+      note TEXT,
+      matched_payment_id TEXT,
+      created_at TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS locations (
@@ -250,6 +263,14 @@ function migrate(database: Db) {
   // Additive columns (migrate-on-boot)
   if (!hasColumn(database, "shops", "business_type")) {
     database.exec(`ALTER TABLE shops ADD COLUMN business_type TEXT NOT NULL DEFAULT 'retail'`);
+  }
+  if (!hasColumn(database, "shops", "min_margin_percent")) {
+    database.exec(`ALTER TABLE shops ADD COLUMN min_margin_percent REAL NOT NULL DEFAULT 0`);
+  }
+  if (!hasColumn(database, "shops", "under_margin_mode")) {
+    database.exec(
+      `ALTER TABLE shops ADD COLUMN under_margin_mode TEXT NOT NULL DEFAULT 'warn'`
+    );
   }
   if (!hasColumn(database, "inventory_items", "bulk_qty")) {
     database.exec(`ALTER TABLE inventory_items ADD COLUMN bulk_qty REAL`);
@@ -385,15 +406,15 @@ function migrate(database: Db) {
     const id = "shop_default";
     database
       .prepare(
-        `INSERT INTO shops (id, name, business_type, vpa_override, is_active, created_at, updated_at, deleted_at)
-         VALUES (?, ?, 'retail', NULL, 1, ?, ?, NULL)`
+        `INSERT INTO shops (id, name, business_type, vpa_override, is_active, min_margin_percent, under_margin_mode, created_at, updated_at, deleted_at)
+         VALUES (?, ?, 'retail', NULL, 1, 0, 'warn', ?, ?, NULL)`
       )
       .run(id, config.displayName || "Main shop", now, now);
   }
 
   database
     .prepare(
-      `INSERT INTO app_meta (key, value) VALUES ('schema_version', '3')
+      `INSERT INTO app_meta (key, value) VALUES ('schema_version', '4')
        ON CONFLICT(key) DO UPDATE SET value = excluded.value`
     )
     .run();

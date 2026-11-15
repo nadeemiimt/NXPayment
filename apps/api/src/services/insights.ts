@@ -1,5 +1,6 @@
 import { getDb } from "../db/schema.js";
 import { config } from "../config.js";
+import { daysUntilExpiry } from "../lib/margin.js";
 
 export interface InsightPattern {
   id: string;
@@ -227,6 +228,73 @@ export function buildInsights(opts: {
     detail: `${success} successful of ${total} payments.`,
     metric: `${total > 0 ? ((success / total) * 100).toFixed(1) : 0}%`,
   });
+
+  // Pharmacy near-expiry (inventory flag for insights)
+  const pharmacyShop = opts.shopId
+    ? (getDb()
+        .prepare(
+          `SELECT business_type FROM shops WHERE id = ? AND deleted_at IS NULL`
+        )
+        .get(opts.shopId) as { business_type: string } | undefined)
+    : (getDb()
+        .prepare(
+          `SELECT business_type FROM shops WHERE is_active = 1 AND deleted_at IS NULL LIMIT 1`
+        )
+        .get() as { business_type: string } | undefined);
+
+  if (pharmacyShop?.business_type === "pharmacy") {
+    const invSql = opts.shopId
+      ? `SELECT name, expiry_date, qty FROM inventory_items
+         WHERE deleted_at IS NULL AND shop_id = ? AND expiry_date IS NOT NULL AND expiry_date != ''`
+      : `SELECT name, expiry_date, qty FROM inventory_items
+         WHERE deleted_at IS NULL AND expiry_date IS NOT NULL AND expiry_date != ''`;
+    const invRows = (
+      opts.shopId
+        ? getDb().prepare(invSql).all(opts.shopId)
+        : getDb().prepare(invSql).all()
+    ) as Array<{ name: string; expiry_date: string; qty: number }>;
+
+    const near = invRows
+      .map((r) => ({
+        name: r.name,
+        days: daysUntilExpiry(r.expiry_date),
+        qty: r.qty,
+      }))
+      .filter((r) => r.days != null && r.days <= 60)
+      .sort((a, b) => (a.days ?? 999) - (b.days ?? 999));
+
+    if (near.length > 0) {
+      const top = near.slice(0, 5);
+      patterns.push({
+        id: "pharmacy_near_expiry",
+        title: "Near-expiry stock",
+        detail: top
+          .map(
+            (t) =>
+              `${t.name} (${t.days! < 0 ? "expired" : `${t.days}d`}${t.qty ? `, qty ${t.qty}` : ""})`
+          )
+          .join("; "),
+        metric: `${near.length} SKUs ≤60d`,
+      });
+      recommendations.push({
+        id: "focus_expiry_push",
+        kind: "focus",
+        title: "Push near-expiry pharmacy SKUs",
+        reason:
+          "Items within 60 days of expiry — promote or discount before write-off (slow-mover tip).",
+        source: "heuristic",
+      });
+      if (near.some((n) => (n.days ?? 0) < 0)) {
+        recommendations.push({
+          id: "deprioritize_expired",
+          kind: "deprioritize",
+          title: "Quarantine expired lots",
+          reason: "Expired inventory should not sell — pull from shelf first.",
+          source: "heuristic",
+        });
+      }
+    }
+  }
 
   // Cap recommendations
   const focus = recommendations.filter((r) => r.kind === "focus").slice(0, 3);
